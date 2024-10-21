@@ -20,7 +20,8 @@ import requests
 import os
 import subprocess
 import warnings
-from rich.progress import track
+import zipfile
+
 
 import numpy as np
 from scipy.interpolate import CubicSpline
@@ -750,10 +751,10 @@ def get_mu_at_t(
 
 
 def check_for_file_download(fp, few_dir, version_string=None):
-    """Download files direct from download.bhptoolkit.org.
+    """Download files direct from zenodo.
 
-    This function downloads the files from download.bhptoolkit.org as they are needed. They are
-    downloaded based on the associated Zenodo record for each version (`record_by_version`).
+    This function downloads the files from zenodo as they are needed. They are
+    downloaded based on the associated record for each version (`record_by_version`).
 
     The version is determined from the `__version__` attribute of `few` unless
     a version string is provided.
@@ -789,9 +790,13 @@ def check_for_file_download(fp, few_dir, version_string=None):
         os.mkdir(few_dir + "few/files/")
 
     # check if the file is in the files filder
-    # if not, download it from download.bhptoolkit.org
+    # if not, download it from zenodo
     if fp not in os.listdir(few_dir + "few/files/"):
-        print("Data file " + fp + " not found. Downloading now.")
+        warnings.warn(
+            "The file {} did not open sucessfully. It will now be downloaded to the proper location.".format(
+                fp
+            )
+        )
 
         # get record number based on version
         # record = record_by_version.get(version_string)
@@ -799,21 +804,38 @@ def check_for_file_download(fp, few_dir, version_string=None):
         # temporary fix
         record = 3981654
 
-        # url to download from with Zenodo fallback in case of failure
-        url = "https://download.bhptoolkit.org/few/data/" + str(record) + "/" + fp
-        zenodourl = "https://zenodo.org/record/" + str(record) + "/files/" + fp
+        # url to zenodo API
+        url = "https://zenodo.org/record/" + str(record) + "/files/" + fp
+        url_2 = "https://www.dropbox.com/scl/fo/0i2jjdudxblrbq1qud7gj/APlGwObGDKZVijsGazTto5Y?rlkey=57zz8vk9fn3csj1extn9tbeyk&st=4m356z7f&dl=1"
+        # run wget from terminal to get the folder
+        # download to proper location
+        # subprocess.run(["wget", "--no-check-certificate", url])
+        result = subprocess.run(["wget", "--no-check-certificate", url])
+        # move it into the files folder
+        # os.rename(fp, few_dir + "few/files/" + fp)
+        
+        if result.returncode != 0:
+            warnings.warn(
+            "\n\n The file {} could not be downloaded from the first URL. Attempting the second URL.\n\n".format(fp))
+            temp_zip_path = os.path.join(few_dir, "temp_folder.zip")
+            result2 = subprocess.run(["wget", "--no-check-certificate", "-O" ,temp_zip_path , url_2])
+                 # If the second download also fails, raise an error
+            if result2.returncode != 0:
+                raise RuntimeError("The file {} could not be downloaded from either URL.".format(fp))
+             # Unzip the downloaded file into the target directory
+            with zipfile.ZipFile(few_dir + "temp_folder.zip", 'r') as zip_ref:
+                zip_ref.extractall(few_dir + "few/files/")
+            # Remove the temporary zip file
+            os.remove(few_dir + "temp_folder.zip")
 
-        # download the file
-        response = requests.get(url, stream=True)
-        if response.ok != True:
-          response = requests.get(zenodourl, stream=True)
+        os.rename(fp, few_dir + "few/files/" + fp)
 
-        # Save the file to the files folder, downloading 8KB at a time
-        with open(few_dir + "few/files/" + fp, mode="wb") as file:
-          filesize = int(response.headers.get('content-length'))
-          csize = 2**15
-          for chunk in track(response.iter_content(chunk_size = csize), description="Downloading "+fp, total=filesize/csize):
-            file.write(chunk)
+
+
+
+
+
+
 
 
 def wrapper(*args, **kwargs):

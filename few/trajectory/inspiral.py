@@ -139,7 +139,7 @@ class EMRIInspiral(TrajectoryBase):
                 check_for_file_download(fp, few_dir)
             except FileNotFoundError:
                 raise ValueError(
-                    f"File required for this ODE ({fp}) was not found in the proper folder ({few_dir + 'few/files/'}) or on download.bhptoolkit.org."
+                    f"File required for this ODE ({fp}) was not found in the proper folder ({few_dir + 'few/files/'}) or on zenodo."
                 )
 
         self.test_new_version = test_new_version
@@ -153,6 +153,7 @@ class EMRIInspiral(TrajectoryBase):
             )
         else:
             raise ValueError
+        
 
         self.func = func
 

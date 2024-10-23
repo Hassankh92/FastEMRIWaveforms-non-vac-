@@ -120,6 +120,13 @@ except OSError:
 parser = argparse.ArgumentParser()
 
 parser.add_argument(
+    "--no_omp",
+    help="If provided, install without OpenMP.",
+    action="store_true",
+    default=False,
+)
+
+parser.add_argument(
     "--lapack_lib",
     help="Directory of the lapack lib. If you add lapack lib, must also add lapack include.",
 )
@@ -173,6 +180,9 @@ for key1, key2 in [
         except ValueError:
             pass
 
+use_omp = not args.no_omp
+
+
 # Obtain the numpy include directory. This logic works across numpy versions.
 try:
     numpy_include = numpy.get_include()
@@ -212,11 +222,38 @@ elif args.gsl_lib is not None or args.gsl_include is not None:
 else:
     add_gsl = False
 
+if "--no_omp" in sys.argv:
+    use_omp = False
+    sys.argv.remove("--no_omp")
+    print("not using omp")
+
+else:
+    use_omp = True
+
+fp_out_name = "few/utils/constants.py"
+fp_in_name = "include/global.h"
+
+# develop few.utils.constants.py
+with open(fp_out_name, "w") as fp_out:
+    with open(fp_in_name, "r") as fp_in:
+        lines = fp_in.readlines()
+        for line in lines:
+            if len(line.split()) == 3:
+                if line.split()[0] == "#define":
+                    try:
+                        _ = float(line.split()[2])
+                        string_out = line.split()[1] + " = " + line.split()[2] + "\n"
+                        fp_out.write(string_out)
+
+                    except (ValueError) as e:
+                        continue
+
 
 # if installing for CUDA, build Cython extensions for gpu modules
 if run_cuda_install:
+
     gpu_extension = dict(
-        libraries=["gsl", "gslcblas", "cudart", "cublas", "cusparse"],
+        libraries=["gsl", "gslcblas", "cudart", "cublas", "cusparse", "gomp"],
         library_dirs=[CUDA["lib64"]],
         runtime_library_dirs=[CUDA["lib64"]],
         language="c++",
@@ -225,7 +262,7 @@ if run_cuda_install:
         # and not with gcc the implementation of this trick is in
         # customize_compiler()
         extra_compile_args={
-            "gcc": ["-std=c++11"],  # '-g'],
+            "gcc": ["-std=c++11", "-fopenmp", "-D__USE_OMP__"],  # '-g'],
             "nvcc": [
                 "-arch=sm_70",
                 "-gencode=arch=compute_50,code=sm_50",
@@ -241,14 +278,24 @@ if run_cuda_install:
                 "-c",
                 "--compiler-options",
                 "'-fPIC'",
+                "-Xcompiler",
+                "-fopenmp",
+                "-D__USE_OMP__",
                 # "-G",
                 # "-g",
                 # "-O0",
                 # "-lineinfo",
             ],  # for debugging
         },
-        include_dirs=[numpy_include, CUDA["include"], "./include"],
+        include_dirs=[numpy_include, CUDA["include"], "include"],
     )
+
+    if use_omp is False:
+        gpu_extension["extra_compile_args"]["nvcc"].remove("-fopenmp")
+        gpu_extension["extra_compile_args"]["gcc"].remove("-fopenmp")
+        gpu_extension["extra_compile_args"]["nvcc"].remove("-D__USE_OMP__")
+        gpu_extension["extra_compile_args"]["gcc"].remove("-D__USE_OMP__")
+        gpu_extension["extra_compile_args"]["nvcc"].remove("-Xcompiler")
 
     if args.ccbin is not None:
         gpu_extension["extra_compile_args"]["nvcc"].insert(
@@ -260,25 +307,24 @@ if run_cuda_install:
     )
 
     interp_ext = Extension(
-        "pyinterp",
-        sources=["src/Utility.cc", "src/interpolate.cu", "src/pyinterp.pyx"],
-        **gpu_extension,
+        "pyinterp", sources=["src/interpolate.cu", "src/pyinterp.pyx"], **gpu_extension
     )
 
     gpuAAK_ext = Extension(
-        "pygpuAAK",
-        sources=["src/Utility.cc", "src/gpuAAK.cu", "src/gpuAAKWrap.pyx"],
-        **gpu_extension,
+        "pygpuAAK", sources=["src/Utility.cc", "src/gpuAAK.cu", "src/gpuAAKWrap.pyx"], **gpu_extension
     )
 
 # build all cpu modules
 cpu_extension = dict(
-    libraries=["gsl", "gslcblas", "lapack", "lapacke", "hdf5", "hdf5_hl"],
+    libraries=["gsl", "gslcblas", "lapack", "lapacke", "gomp", "hdf5", "hdf5_hl"],
     language="c++",
     runtime_library_dirs=[],
-    extra_compile_args={"gcc": ["-std=c++11"]},  # '-g'
-    include_dirs=[numpy_include, "./include"],
+    extra_compile_args={
+        "gcc": ["-std=c++11", "-fopenmp", "-fPIC", "-D__USE_OMP__"]
+    },  # '-g'
+    include_dirs=[numpy_include, "include"],
     library_dirs=None,
+    # library_dirs=["/home/ajchua/lib/"],
 )
 
 if add_lapack:
@@ -297,9 +343,13 @@ if add_gsl:
     )
     cpu_extension["include_dirs"] += gsl_include
 
+if use_omp is False:
+    cpu_extension["extra_compile_args"]["gcc"].remove("-fopenmp")
+    cpu_extension["extra_compile_args"]["gcc"].remove("-D__USE_OMP__")
+
 Interp2DAmplitude_ext = Extension(
     "pyInterp2DAmplitude",
-    sources=["src/Interpolant.cc", "src/Amplitude.cc", "src/pyinterp2damp.pyx"],
+    sources=[ "src/Utility.cc","src/Interpolant.cc", "src/Amplitude.cc", "src/pyinterp2damp.pyx"],
     **cpu_extension,
 )
 
@@ -309,6 +359,7 @@ inspiral_ext = Extension(
         "src/Utility.cc",
         "src/Interpolant.cc",
         "src/dIdt8H_5PNe10.cc",
+        "src/KerrEquatorial.cc",
         "src/ode.cc",
         "src/Inspiral.cc",
         "src/inspiralwrap.pyx",
@@ -328,20 +379,33 @@ fund_freqs_ext = Extension(
     **cpu_extension,
 )
 
+# Install cpu versions of gpu modules
+
+# need to copy cuda files to cpp for this special compiler we are using
+# also copy pyx files to cpu version
+src = "src/"
+
+cp_cu_files = ["matmul", "interpolate", "gpuAAK"]
+cp_pyx_files = ["pymatmul", "pyinterp", "gpuAAKWrap"]
+
+for fp in cp_cu_files:
+    shutil.copy(src + fp + ".cu", src + fp + ".cpp")
+
+for fp in cp_pyx_files:
+    shutil.copy(src + fp + ".pyx", src + fp + "_cpu.pyx")
+
 matmul_cpu_ext = Extension(
     "pymatmul_cpu", sources=["src/matmul.cpp", "src/pymatmul_cpu.pyx"], **cpu_extension
 )
 
 interp_cpu_ext = Extension(
     "pyinterp_cpu",
-    sources=["src/Utility.cc", "src/interpolate.cpp", "src/pyinterp_cpu.pyx"],
+    sources=["src/interpolate.cpp", "src/pyinterp_cpu.pyx"],
     **cpu_extension,
 )
 
 AAK_cpu_ext = Extension(
-    "pycpuAAK",
-    sources=["src/Utility.cc", "src/gpuAAK.cpp", "src/gpuAAKWrap_cpu.pyx"],
-    **cpu_extension,
+    "pycpuAAK", sources=["src/Utility.cc", "src/gpuAAK.cpp", "src/gpuAAKWrap_cpu.pyx"], **cpu_extension
 )
 
 
@@ -350,6 +414,17 @@ spher_harm_ext = Extension(
     sources=["src/SWSH.cc", "src/pySWSH.pyx"],
     **cpu_extension,
 )
+
+tpi = Extension("TPI",
+              sources=["src/TPI.pyx", "src/TensorProductInterpolation.c"],
+              language="c",
+              libraries=["gsl", "gslcblas"],
+              include_dirs=[numpy_include, "include"],
+            library_dirs=None,
+            extra_compile_args={
+        "gcc": ["-std=c++11", "-fopenmp", "-fPIC", "-D__USE_OMP__","-std=c99", "-O3"]
+    },
+    )
 
 cpu_extensions = [
     matmul_cpu_ext,
@@ -360,6 +435,7 @@ cpu_extensions = [
     Interp2DAmplitude_ext,
     fund_freqs_ext,
     AAK_cpu_ext,
+    # tpi
 ]
 
 if run_cuda_install:
@@ -371,14 +447,30 @@ else:
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+# setup version file
+with open("README.md", "r") as fh:
+    lines = fh.readlines()
+
+for line in lines:
+    if line.startswith("Current Version"):
+        version_string = line.split("Current Version: ")[1].split("\n")[0]
+
+with open("few/_version.py", "w") as f:
+    f.write("__version__ = '{}'".format(version_string))
+
+# prepare the ode files
+from few.utils.odeprepare import ode_prepare
+
+ode_prepare()
+
 setup(
-    name="fastemriwaveforms",
+    name="few",
     author="Michael Katz",
     author_email="mikekatz04@gmail.com",
     description="Fast and accurate EMRI Waveforms.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version="1.5.5",
+    version=version_string,
     url="https://github.com/mikekatz04/FastEMRIWaveforms",
     ext_modules=extensions,
     packages=["few", "few.utils", "few.trajectory", "few.amplitude", "few.summation"],
@@ -398,3 +490,37 @@ setup(
     zip_safe=False,
     python_requires=">=3.6",
 )
+
+
+# remove src files created in this setup (cpp, pyx cpu files for gpu modules)
+for fp in cp_cu_files:
+    os.remove(src + fp + ".cpp")
+
+for fp in cp_pyx_files:
+    os.remove(src + fp + "_cpu.pyx")
+
+
+package_name = "few"  # Replace "few" with the name of the package you want to find the location for
+import site
+import importlib
+
+def get_package_location(package_name):
+    try:
+        package_module = importlib.import_module(package_name)
+        package_location = site.getsitepackages()[0]  # Retrieves the first site-packages directory
+        return package_location
+    except ModuleNotFoundError:
+        print(f"Package '{package_name}' not found. Make sure it is installed.")
+        return None
+
+package_name = "few"  # Replace "few" with the name of the package you want to find the location for
+location = get_package_location(package_name)
+import glob
+folder_path = glob.glob(location+'/'+package_name+'*/few/')[0] + 'files'
+os.makedirs(folder_path)
+print(f"The folder '{folder_path}' was created. Transferring files there")
+the_command = 'cp -r ./few/files/* ' + folder_path + '/'
+os.system(the_command)
+the_command = 'ls ' + folder_path + '/'
+print(f"Showing the folder '{folder_path}")
+os.system(the_command)

@@ -22,20 +22,17 @@ from abc import ABC
 import numpy as np
 from tqdm import tqdm
 from scipy.interpolate import RectBivariateSpline
+import warnings
 
 # check if cupy is available / GPU is available
 try:
+    # import cupy as xp
     import cupy as cp
 
 except (ImportError, ModuleNotFoundError) as e:
     import numpy as xp
 
-from few.utils.baseclasses import (
-    SchwarzschildEccentric,
-    Pn5AAK,
-    ParallelModuleBase,
-    KerrCircular,
-)
+from few.utils.baseclasses import SchwarzschildEccentric, Pn5AAK, ParallelModuleBase, KerrCircular
 from few.trajectory.inspiral import EMRIInspiral
 from few.amplitude.interp2dcubicspline import Interp2DAmplitude, Interp2DAmplitudeKerrCircular
 from few.utils.utility import get_mismatch, xI_to_Y, p_to_y, check_for_file_download
@@ -46,11 +43,8 @@ from few.summation.directmodesum import DirectModeSum
 from few.summation.aakwave import AAKSummation
 from few.utils.constants import *
 from few.utils.citations import *
-from few.summation.interpolatedmodesum import (
-    InterpolatedModeSum,
-    InterpolatedModeSumKerrCircular,
-)
-# from few.summation.fdinterp import FDInterpolatedModeSum
+from few.summation.interpolatedmodesum import InterpolatedModeSum, CubicSplineInterpolant, InterpolatedModeSumKerrCircular
+
 
 
 class GenerateEMRIWaveform:
@@ -88,6 +82,7 @@ class GenerateEMRIWaveform:
     def __init__(
         self, waveform_class, *args, frame="detector", return_list=False, **kwargs
     ):
+
         # instantiate the class
         if isinstance(waveform_class, str):
             try:
@@ -107,6 +102,8 @@ class GenerateEMRIWaveform:
         # setup arguments to remove based on the specific waveform
         # also get proper phases
         self.args_remove = []
+        
+
         if self.waveform_generator.descriptor == "eccentric":
             self.args_remove.append(5)
 
@@ -118,6 +115,16 @@ class GenerateEMRIWaveform:
         if self.waveform_generator.background == "Schwarzschild":
             # remove spin
             self.args_remove.append(2)
+        
+        if "equatorial" in self.waveform_generator.descriptor: # this line added to be compatible with Kerr case
+            self.args_remove.append(5)
+            
+            self.phases_needed = {"Phi_phi0": 11, "Phi_r0": 13}
+
+
+        
+
+
 
         # remove sky and orientation parameters
         if self.waveform_generator.frame == "source":
@@ -127,6 +134,9 @@ class GenerateEMRIWaveform:
         # these are the arguments that go in to the generator
         self.args_keep = np.delete(np.arange(11), self.args_remove)
 
+
+      
+
     @property
     def stock_waveform_options(self):
         print(
@@ -134,9 +144,12 @@ class GenerateEMRIWaveform:
             FastSchwarzschildEccentricFlux
             SlowSchwarzschildEccentricFlux
             Pn5AAKWaveform
-            KerrCircularFlux
-            MigrationTorqueKerrCircularFlux
-            ScalarCloudKerrCircularFlux
+            RelativisticKerrCircularFlux
+            Disk_Kerr_AAK_Waveform
+            Axion_RelativisticKerrCircularFlux
+            Rel_Axion_RelativisticKerrCircularFlux
+            Disk_RelativisticKerrCircularFlux
+
             """
         )
 
@@ -188,6 +201,8 @@ class GenerateEMRIWaveform:
         up_ldc = cqS * sqK * np.cos(phiS - phiK) - cqK * sqS
         dw_ldc = sqK * np.sin(phiS - phiK)
 
+
+
         if dw_ldc != 0.0:
             psi_ldc = -np.arctan2(up_ldc, dw_ldc)
 
@@ -205,6 +220,7 @@ class GenerateEMRIWaveform:
 
         hp_new = FplusI * hp + FcrosI * hc
         hc_new = FplusII * hp + FcrosII * hc
+
 
         return hp_new, hc_new
 
@@ -279,6 +295,7 @@ class GenerateEMRIWaveform:
             Phi_r0,
         )
 
+
         # if Y is needed rather than x (inclination definition)
         if (
             hasattr(self.waveform_generator, "needs_Y")
@@ -286,6 +303,7 @@ class GenerateEMRIWaveform:
             and self.waveform_generator.needs_Y
         ):
             x0 = xI_to_Y(a, p0, e0, x0)
+
 
         # remove the arguments that are not used in this waveform
         args = tuple([args_all[i] for i in self.args_keep])
@@ -299,10 +317,7 @@ class GenerateEMRIWaveform:
             dist_dimensionless = (dist * Gpc) / (mu * MRSUN_SI)
 
             # get viewing angles in the source frame
-            (
-                theta_source,
-                phi_source,
-            ) = self._get_viewing_angles(qS, phiS, qK, phiK)
+            (theta_source, phi_source,) = self._get_viewing_angles(qS, phiS, qK, phiK)
 
             args += (theta_source, phi_source)
 
@@ -315,7 +330,6 @@ class GenerateEMRIWaveform:
                 dist_dimensionless = 1.0 / ((dist * Gpc) / (mu * MRSUN_SI))
             else:
                 dist_dimensionless = 1.0
-
         # add additional arguments to waveform interface
         args += add_args
 
@@ -330,23 +344,20 @@ class GenerateEMRIWaveform:
             h *= -1
 
         # transform to SSB frame if desired
-        if self.waveform_generator.create_waveform.output_type == "td":
-            if self.frame == "detector":
-                hp, hc = self._to_SSB_frame(h.real, -h.imag, qS, phiS, qK, phiK)
-            elif self.frame == "source":
-                hp, hc = h.real, -h.imag
+        if self.frame == "detector":
+            hp = h.real
+            hc = -h.imag
 
-        # if FD, h is of length 2 rather than h+ - ihx
-        if self.waveform_generator.create_waveform.output_type == "fd":
-            if self.frame == "detector":
-                hp, hc = self._to_SSB_frame(h[0], h[1], qS, phiS, qK, phiK)
-            elif self.frame == "source":
-                hp, hc = h[0], h[1]
+            hp, hc = self._to_SSB_frame(hp, hc, qS, phiS, qK, phiK)
+            h = hp - 1j * hc
 
         if self.return_list is False:
-            return hp - 1j * hc
+            return h
+
         else:
-            return [hp, hc]
+            hp = h.real
+            hx = -h.imag
+            return [hp, hx]
 
 
 # get path to this file
@@ -432,6 +443,7 @@ class SchwarzschildEccentricWaveformBase(
         num_threads=None,
         normalize_amps=True,
     ):
+
         ParallelModuleBase.__init__(self, use_gpu=use_gpu, num_threads=num_threads)
         SchwarzschildEccentric.__init__(self, use_gpu=use_gpu)
 
@@ -488,9 +500,7 @@ class SchwarzschildEccentricWaveformBase(
             larger_few_citation
             + few_citation
             + few_software_citation
-            + fd_citation
             + romannet_citation
-            + FD_citation
         )
 
     def __call__(
@@ -512,7 +522,6 @@ class SchwarzschildEccentricWaveformBase(
         batch_size=-1,
         mode_selection=None,
         include_minus_m=True,
-        **kwargs,
     ):
         """Call function for SchwarzschildEccentric models.
 
@@ -574,9 +583,12 @@ class SchwarzschildEccentricWaveformBase(
         else:
             xp = np
 
+        
         # makes sure viewing angles are allowable
         theta, phi = self.sanity_check_viewing_angles(theta, phi)
         self.sanity_check_init(M, mu, p0, e0)
+
+
 
         # get trajectory
         (t, p, e, x, Phi_phi, Phi_theta, Phi_r) = self.inspiral_generator(
@@ -603,12 +615,12 @@ class SchwarzschildEccentricWaveformBase(
 
         self.end_time = t[-1]
         # convert for gpu
-        t = xp.asarray(t)
-        p = xp.asarray(p)
-        e = xp.asarray(e)
-        Phi_phi = xp.asarray(Phi_phi)
-        Phi_r = xp.asarray(Phi_r)
-        amp_norm = xp.asarray(amp_norm)
+        t = self.xp.asarray(t)
+        p = self.xp.asarray(p)
+        e = self.xp.asarray(e)
+        Phi_phi = self.xp.asarray(Phi_phi)
+        Phi_r = self.xp.asarray(Phi_r)
+        amp_norm = self.xp.asarray(amp_norm)
 
         # get ylms only for unique (l,m) pairs
         # then expand to all (lmn with self.inverse_lm)
@@ -619,7 +631,7 @@ class SchwarzschildEccentricWaveformBase(
         # split into batches
 
         if batch_size == -1 or self.allow_batching is False:
-            inds_split_all = [xp.arange(len(t))]
+            inds_split_all = [self.xp.arange(len(t))]
         else:
             split_inds = []
             i = 0
@@ -629,7 +641,7 @@ class SchwarzschildEccentricWaveformBase(
                     break
                 split_inds.append(i)
 
-            inds_split_all = xp.split(xp.arange(len(t)), split_inds)
+            inds_split_all = self.xp.split(self.xp.arange(len(t)), split_inds)
 
         # select tqdm if user wants to see progress
         iterator = enumerate(inds_split_all)
@@ -639,6 +651,7 @@ class SchwarzschildEccentricWaveformBase(
             print("total:", len(inds_split_all))
 
         for i, inds_in in iterator:
+
             # get subsections of the arrays for each batch
             t_temp = t[inds_in]
             p_temp = p[inds_in]
@@ -649,13 +662,14 @@ class SchwarzschildEccentricWaveformBase(
 
             # amplitudes
             teuk_modes = self.amplitude_generator(p_temp, e_temp)
+            teuk_modes = xp.asarray(teuk_modes)
 
             # normalize by flux produced in trajectory
             if self.normalize_amps:
-                amp_for_norm = xp.sum(
-                    xp.abs(
-                        xp.concatenate(
-                            [teuk_modes, xp.conj(teuk_modes[:, self.m0mask])],
+                amp_for_norm = self.xp.sum(
+                    self.xp.abs(
+                        self.xp.concatenate(
+                            [teuk_modes, self.xp.conj(teuk_modes[:, self.m0mask])],
                             axis=1,
                         )
                     )
@@ -670,18 +684,19 @@ class SchwarzschildEccentricWaveformBase(
             # different types of mode selection
             # sets up ylm and teuk_modes properly for summation
             if isinstance(mode_selection, str):
+
                 # use all modes
                 if mode_selection == "all":
                     self.ls = self.l_arr[: teuk_modes.shape[1]]
                     self.ms = self.m_arr[: teuk_modes.shape[1]]
                     self.ns = self.n_arr[: teuk_modes.shape[1]]
 
-                    keep_modes = xp.arange(teuk_modes.shape[1])
+                    keep_modes = self.xp.arange(teuk_modes.shape[1])
                     temp2 = keep_modes * (keep_modes < self.num_m0) + (
                         keep_modes + self.num_m_1_up
                     ) * (keep_modes >= self.num_m0)
 
-                    ylmkeep = xp.concatenate([keep_modes, temp2])
+                    ylmkeep = self.xp.concatenate([keep_modes, temp2])
                     ylms_in = ylms[ylmkeep]
                     teuk_modes_in = teuk_modes
 
@@ -693,16 +708,16 @@ class SchwarzschildEccentricWaveformBase(
                 if mode_selection == []:
                     raise ValueError("If mode selection is a list, cannot be empty.")
 
-                keep_modes = xp.zeros(len(mode_selection), dtype=xp.int32)
+                keep_modes = self.xp.zeros(len(mode_selection), dtype=self.xp.int32)
 
                 # for removing opposite m modes
-                fix_include_ms = xp.full(2 * len(mode_selection), False)
+                fix_include_ms = self.xp.full(2 * len(mode_selection), False)
                 for jj, lmn in enumerate(mode_selection):
                     l, m, n = tuple(lmn)
 
                     # keep modes only works with m>=0
                     lmn_in = (l, abs(m), n)
-                    keep_modes[jj] = xp.int32(self.lmn_indices[lmn_in])
+                    keep_modes[jj] = self.xp.int32(self.lmn_indices[lmn_in])
 
                     if not include_minus_m:
                         if m > 0:
@@ -720,7 +735,7 @@ class SchwarzschildEccentricWaveformBase(
                     keep_modes + self.num_m_1_up
                 ) * (keep_modes >= self.num_m0)
 
-                ylmkeep = xp.concatenate([keep_modes, temp2])
+                ylmkeep = self.xp.concatenate([keep_modes, temp2])
                 ylms_in = ylms[ylmkeep]
 
                 # remove modes if include_minus_m is False
@@ -735,7 +750,7 @@ class SchwarzschildEccentricWaveformBase(
                     0.0,
                     p_temp,
                     e_temp,
-                    xp.zeros_like(e_temp),
+                    self.xp.zeros_like(e_temp),
                 )
                 modeinds = [self.l_arr, self.m_arr, self.n_arr]
                 (
@@ -745,11 +760,7 @@ class SchwarzschildEccentricWaveformBase(
                     self.ms,
                     self.ns,
                 ) = self.mode_selector(
-                    teuk_modes,
-                    ylms,
-                    modeinds,
-                    fund_freq_args=fund_freq_args,
-                    eps=eps,
+                    teuk_modes, ylms, modeinds, fund_freq_args=fund_freq_args, eps=eps,
                 )
 
             # store number of modes for external information
@@ -770,12 +781,11 @@ class SchwarzschildEccentricWaveformBase(
                 dt=dt,
                 T=T,
                 include_minus_m=include_minus_m,
-                **kwargs,
             )
 
             # if batching, need to add the waveform
             if i > 0:
-                waveform = xp.concatenate([waveform, waveform_temp])
+                waveform = self.xp.concatenate([waveform, waveform_temp])
 
             # return entire waveform
             else:
@@ -788,6 +798,24 @@ class SchwarzschildEccentricWaveformBase(
             dist_dimensionless = 1.0
 
         return waveform / dist_dimensionless
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class FastSchwarzschildEccentricFlux(SchwarzschildEccentricWaveformBase):
@@ -841,23 +869,14 @@ class FastSchwarzschildEccentricFlux(SchwarzschildEccentricWaveformBase):
         *args,
         **kwargs,
     ):
+
         inspiral_kwargs["func"] = "SchwarzEccFlux"
-
-        if "output_type" in sum_kwargs:
-            if sum_kwargs["output_type"] == "fd":
-                mode_summation_module = 0.0#FDInterpolatedModeSum
-
-            else:
-                mode_summation_module = InterpolatedModeSum
-
-        else:
-            mode_summation_module = InterpolatedModeSum
 
         SchwarzschildEccentricWaveformBase.__init__(
             self,
             EMRIInspiral,
             RomanAmplitude,
-            mode_summation_module,
+            InterpolatedModeSum,
             inspiral_kwargs=inspiral_kwargs,
             amplitude_kwargs=amplitude_kwargs,
             sum_kwargs=sum_kwargs,
@@ -957,6 +976,7 @@ class SlowSchwarzschildEccentricFlux(SchwarzschildEccentricWaveformBase):
         *args,
         **kwargs,
     ):
+
         # declare specific properties
         inspiral_kwargs["DENSE_STEPPING"] = 1
         inspiral_kwargs["func"] = "SchwarzEccFlux"
@@ -974,6 +994,391 @@ class SlowSchwarzschildEccentricFlux(SchwarzschildEccentricWaveformBase):
             *args,
             **kwargs,
         )
+
+
+
+
+
+
+
+class AAKWaveformBase(Pn5AAK, ParallelModuleBase, ABC):
+    """Waveform generation class for AAK with arbitrary trajectory.
+
+    This class generates waveforms based on the Augmented Analytic Kludge
+    given in the
+    `EMRI Kludge Suite <https://github.com/alvincjk/EMRI_Kludge_Suite/>`_.
+    The trajectory is chosen by user or by default in child classes.
+
+    The trajectory is calculated until the orbit reaches
+    within 0.1 of the separatrix, determined from
+    `arXiv:1912.07609 <https://arxiv.org/abs/1912.07609/>`_. The
+    fundamental frequencies along the trajectory at each point are then
+    calculated from the orbital parameters and the spin value given by (`Schmidt 2002 <https://arxiv.org/abs/gr-qc/0202090>`_).
+
+    These frequencies along the trajectory are then used to map to the
+    frequency basis of the `Analytic Kludge <https://arxiv.org/abs/gr-qc/0310125>`_. This mapping
+    takes the form of time evolving large mass and spin parameters, as
+    well as the use of phases and frequencies in
+    :math:`(alpha, \Phi, \gamma)`:
+
+    .. math:: \Phi = \Phi_\phi,
+
+    .. math:: \gamma = \Phi_\phi + \Phi_\Theta,
+
+    .. math:: alpha = \Phi_\phi + \Phi_\Theta + \Phi_r.
+
+    The frequencies in that basis are found by taking the time derivatives
+    of each equation above.
+
+    This class has GPU capabilities and works from the sparse trajectory
+    methodoligy with cubic spine interpolation of the smoothly varying
+    waveform quantities.
+
+    **Please note:** the AAK waveform takes the parameter
+    :math:`Y\equiv\cos{\iota}=L/\sqrt{L^2 + Q}` rather than :math:`x_I` as is accepted
+    for relativistic waveforms and in the generic waveform interface discussed above.
+    The generic waveform interface directly converts :math:`x_I` to :math:`Y`.
+
+    args:
+        inspiral_module (obj): Class object representing the module
+            for creating the inspiral. This returns the phases and orbital
+            parameters. See :ref:`trajectory-label`.
+        sum_module (obj): Class object representing the module for summing the
+            final waveform from the amplitude and phase information. See
+            :ref:`summation-label`.
+        inspiral_kwargs (dict, optional): Optional kwargs to pass to the
+            inspiral generator. **Important Note**: These kwargs are passed
+            online, not during instantiation like other kwargs here. Default is
+            {}. This is stored as an attribute.
+        sum_kwargs (dict, optional): Optional kwargs to pass to the
+            sum module during instantiation. Default is {}.
+        use_gpu (bool, optional): If True, use GPU resources. Default is False.
+        num_threads (int, optional): Number of parallel threads to use in OpenMP.
+            If :code:`None`, will not set the global variable :code:`OMP_NUM_THREADS`.
+            Default is None.
+
+    """
+
+    def __init__(
+        self,
+        inspiral_module,
+        sum_module,
+        inspiral_kwargs={},
+        sum_kwargs={},
+        use_gpu=False,
+        num_threads=None,
+    ):
+
+        ParallelModuleBase.__init__(self, use_gpu=use_gpu, num_threads=num_threads)
+        Pn5AAK.__init__(self)
+
+        sum_kwargs = self.adjust_gpu_usage(use_gpu, sum_kwargs)
+
+        # kwargs that are passed to the inspiral call function
+        self.inspiral_kwargs = inspiral_kwargs
+
+        # function for generating the inpsiral
+        self.inspiral_generator = inspiral_module(**inspiral_kwargs)
+
+        # summation generator
+        self.create_waveform = sum_module(**sum_kwargs)
+
+    def attributes_AAKWaveform(self):
+        """
+        attributes:
+            inspiral_generator (obj): instantiated trajectory module.
+            create_waveform (obj): instantiated summation module.
+            inspiral_kwargs (dict): Kwargs related to the inspiral.
+            xp (obj): numpy or cupy based on gpu usage.
+            num_modes_kept/nmodes (int): Number of modes for final waveform.
+                For this model, it is solely determined from the
+                eccentricity.
+
+
+        """
+        pass
+
+    @property
+    def citation(self):
+        """Return citations related to this module"""
+        return (
+            larger_few_citation
+            + few_citation
+            + few_software_citation
+            + AAK_citation_1
+            + AAK_citation_2
+            + AK_citation
+            + kerr_separatrix_citation
+        )
+
+    @property
+    def gpu_capability(self):
+        return True
+
+    @property
+    def is_source_frame(self):
+        return False
+
+    @property
+    def allow_batching(self):
+        return False
+
+    def __call__(
+        self,
+        M,
+        mu,
+        a,
+        p0,
+        e0,
+        Y0,
+        dist,
+        qS,
+        phiS,
+        qK,
+        phiK,
+        *args,
+        Phi_phi0=0.0,
+        Phi_theta0=0.0,
+        Phi_r0=0.0,
+        mich=False,
+        dt=10.0,
+        T=1.0,
+    ):
+        """Call function for AAK + 5PN model.
+
+        This function will take input parameters and produce AAK waveforms with 5PN trajectories in generic Kerr.
+
+        args:
+            M (double): Mass of larger black hole in solar masses.
+            mu (double): Mass of compact object in solar masses.
+            a (double): Dimensionless spin of massive black hole.
+            p0 (double): Initial semilatus rectum (Must be greater than
+                the separatrix at the the given e0 and Y0).
+                See documentation for more information.
+            e0 (double): Initial eccentricity.
+            Y0 (double): Initial cosine of :math:`\iota`. :math:`Y=\cos{\iota}\equiv L_z/\sqrt{L_z^2 + Q}`
+                in the semi-relativistic formulation.
+            dist (double): Luminosity distance in Gpc.
+            qS (double): Sky location polar angle in ecliptic
+                coordinates.
+            phiS (double): Sky location azimuthal angle in
+                ecliptic coordinates.
+            qK (double): Initial BH spin polar angle in ecliptic
+                coordinates.
+            phiK (double): Initial BH spin azimuthal angle in
+                ecliptic coordinates.
+            *args (tuple, optional): Any additional arguments required for the
+                trajectory.
+            Phi_phi0 (double, optional): Initial phase for :math:`\Phi_\phi`.
+                Default is 0.0.
+            Phi_theta0 (double, optional): Initial phase for :math:`\Phi_\Theta`.
+                Default is 0.0.
+            Phi_r0 (double, optional): Initial phase for :math:`\Phi_r`.
+                Default is 0.0.
+            mich (bool, optional): If True, produce waveform with
+                long-wavelength response approximation (hI, hII). Please
+                note this is not TDI. If False, return hplus and hcross.
+                Default is False.
+            dt (double, optional): Time between samples in seconds
+                (inverse of sampling frequency). Default is 10.0.
+            T (double, optional): Total observation time in years.
+                Default is 1.0.
+
+        Returns:
+            1D complex128 xp.ndarray: The output waveform.
+
+        Raises:
+            ValueError: user selections are not allowed.
+
+        """
+
+        # makes sure angular extrinsic parameters are allowable
+        qS, phiS, qK, phiK = self.sanity_check_angles(qS, phiS, qK, phiK)
+
+        self.sanity_check_init(M, mu, a, p0, e0, Y0)
+
+        # get trajectory
+        t, p, e, Y, Phi_phi, Phi_theta, Phi_r = self.inspiral_generator(
+            M,
+            mu,
+            a,
+            p0,
+            e0,
+            Y0,
+            *args,
+            Phi_phi0=Phi_phi0,
+            Phi_theta0=Phi_theta0,
+            Phi_r0=Phi_r0,
+            T=T,
+            dt=dt,
+            **self.inspiral_kwargs,
+        )
+        
+        # if len(t)>160:
+        #     warnings.warn(f"The inspiral output length={len(t)} is greater than the number of maximum allowable spline points. Splining the output...")
+        #     y_all = np.stack((p, e, Y, Phi_phi, Phi_theta, Phi_r))
+        #     spline_output = CubicSplineInterpolant(t,y_all, use_gpu=self.use_gpu)
+        #     new_t = np.linspace(0.0, t[-1],num=160)
+        #     t = new_t.copy()
+        #     new_output_inspiral = spline_output(new_t)
+        #     p, e, Y, Phi_phi, Phi_theta, Phi_r = (new_output_inspiral[i] for i in range(6))
+
+        # makes sure p, Y, and e are generally within the model
+        self.sanity_check_traj(p, e, Y)
+
+        self.end_time = t[-1]
+
+        # number of modes to use (from original AAK model)
+        self.num_modes_kept = self.nmodes = int(30 * e0)
+        if self.num_modes_kept < 4:
+            self.num_modes_kept = self.nmodes = 4
+
+        waveform = self.create_waveform(
+            t,
+            M,
+            a,
+            p,
+            e+1e-9,
+            Y,
+            dist,
+            Phi_phi,
+            Phi_theta,
+            Phi_r,
+            mu,
+            qS,
+            phiS,
+            qK,
+            phiK,
+            self.nmodes,
+            mich=mich,
+            dt=dt,
+            T=T,
+        )
+
+        return waveform
+
+
+class Pn5AAKWaveform(AAKWaveformBase, Pn5AAK, ParallelModuleBase, ABC):
+    """Waveform generation class for AAK with 5PN trajectory.
+
+    This class generates waveforms based on the Augmented Analytic Kludge
+    given in the
+    `EMRI Kludge Suite <https://github.com/alvincjk/EMRI_Kludge_Suite/>`_.
+    However, here the trajectory is vastly improved by employing the 5PN
+    fluxes for generic Kerr orbits from
+    `Fujita & Shibata 2020<https://arxiv.org/abs/2008.13554>`_.
+
+    The 5PN trajectory produces orbital and phase trajectories.
+    The trajectory is calculated until the orbit reaches
+    within 0.2 of the separatrix, determined from
+    `arXiv:1912.07609 <https://arxiv.org/abs/1912.07609/>`_. The
+    fundamental frequencies along the trajectory at each point are then
+    calculated from the orbital parameters and the spin value given by (`Schmidt 2002 <https://arxiv.org/abs/gr-qc/0202090>`_).
+
+    These frequencies along the trajectory are then used to map to the
+    frequency basis of the `Analytic Kludge <https://arxiv.org/abs/gr-qc/0310125>`_. This mapping
+    takes the form of time evolving large mass and spin parameters, as
+    well as the use of phases and frequencies in
+    :math:`(alpha, \Phi, \gamma)`:
+
+    .. math:: \Phi = \Phi_\phi,
+
+    .. math:: \gamma = \Phi_\phi + \Phi_\Theta,
+
+    .. math:: alpha = \Phi_\phi + \Phi_\Theta + \Phi_r.
+
+    The frequencies in that basis are found by taking the time derivatives
+    of each equation above.
+
+    This class has GPU capabilities and works from the sparse trajectory
+    methodoligy with cubic spine interpolation of the smoothly varying
+    waveform quantities. This waveform does not have the freedom in terms
+    of user-chosen quantitites that
+    :class:`few.waveform.SchwarzschildEccentricWaveformBase` contains.
+    This is mainly due to the specific waveform constructions particular
+    to the AAK/AK.
+
+    **Please note:** the 5PN trajectory and AAK waveform take the parameter
+    :math:`Y\equiv\cos{\iota}=L/\sqrt{L^2 + Q}` rather than :math:`x_I` as is accepted
+    for relativistic waveforms and in the generic waveform interface discussed above.
+    The generic waveform interface directly converts :math:`x_I` to :math:`Y`.
+
+    args:
+        inspiral_kwargs (dict, optional): Optional kwargs to pass to the
+            inspiral generator. **Important Note**: These kwargs are passed
+            online, not during instantiation like other kwargs here. Default is
+            {}. This is stored as an attribute.
+        sum_kwargs (dict, optional): Optional kwargs to pass to the
+            sum module during instantiation. Default is {}.
+        use_gpu (bool, optional): If True, use GPU resources. Default is False.
+        num_threads (int, optional): Number of parallel threads to use in OpenMP.
+            If :code:`None`, will not set the global variable :code:`OMP_NUM_THREADS`.
+            Default is None.
+
+    """
+
+    def __init__(
+        self, inspiral_kwargs={}, sum_kwargs={}, use_gpu=False, num_threads=None
+    ):
+
+        inspiral_kwargs["func"] = "pn5"
+
+        AAKWaveformBase.__init__(
+            self,
+            EMRIInspiral,
+            AAKSummation,
+            inspiral_kwargs=inspiral_kwargs,
+            sum_kwargs=sum_kwargs,
+            use_gpu=use_gpu,
+            num_threads=num_threads,
+        )
+
+    def attributes_Pn5AAKWaveform(self):
+        """
+        attributes:
+            inspiral_generator (obj): instantiated trajectory module.
+            create_waveform (obj): instantiated summation module.
+            inspiral_kwargs (dict): Kwargs related to the inspiral class:
+                :class:`few.trajectory.pn5.RunKerrGenericPn5Inspiral`.
+            xp (obj): numpy or cupy based on gpu usage.
+            num_modes_kept/nmodes (int): Number of modes for final waveform.
+                For this model, it is solely determined from the
+                eccentricity.
+
+
+        """
+        pass
+
+    @property
+    def citation(self):
+        """Return citations related to this module"""
+        return (
+            larger_few_citation
+            + few_citation
+            + few_software_citation
+            + AAK_citation_1
+            + AAK_citation_2
+            + AK_citation
+            + Pn5_citation
+            + kerr_separatrix_citation
+        )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ******************* Kerr base class here
@@ -1490,371 +1895,4 @@ class ScalarCloudKerrCircularFlux(RelativisticKerrCircularWaveformBase):
             *args,
             **kwargs,
         )
-
-
-
-
-
-
-
-
-
-
-
-class AAKWaveformBase(Pn5AAK, ParallelModuleBase, ABC):
-    """Waveform generation class for AAK with arbitrary trajectory.
-
-    This class generates waveforms based on the Augmented Analytic Kludge
-    given in the
-    `EMRI Kludge Suite <https://github.com/alvincjk/EMRI_Kludge_Suite/>`_.
-    The trajectory is chosen by user or by default in child classes.
-
-    The trajectory is calculated until the orbit reaches
-    within 0.1 of the separatrix, determined from
-    `arXiv:1912.07609 <https://arxiv.org/abs/1912.07609/>`_. The
-    fundamental frequencies along the trajectory at each point are then
-    calculated from the orbital parameters and the spin value given by (`Schmidt 2002 <https://arxiv.org/abs/gr-qc/0202090>`_).
-
-    These frequencies along the trajectory are then used to map to the
-    frequency basis of the `Analytic Kludge <https://arxiv.org/abs/gr-qc/0310125>`_. This mapping
-    takes the form of time evolving large mass and spin parameters, as
-    well as the use of phases and frequencies in
-    :math:`(alpha, \Phi, \gamma)`:
-
-    .. math:: \Phi = \Phi_\phi,
-
-    .. math:: \gamma = \Phi_\phi + \Phi_\Theta,
-
-    .. math:: alpha = \Phi_\phi + \Phi_\Theta + \Phi_r.
-
-    The frequencies in that basis are found by taking the time derivatives
-    of each equation above.
-
-    This class has GPU capabilities and works from the sparse trajectory
-    methodoligy with cubic spine interpolation of the smoothly varying
-    waveform quantities.
-
-    **Please note:** the AAK waveform takes the parameter
-    :math:`Y\equiv\cos{\iota}=L/\sqrt{L^2 + Q}` rather than :math:`x_I` as is accepted
-    for relativistic waveforms and in the generic waveform interface discussed above.
-    The generic waveform interface directly converts :math:`x_I` to :math:`Y`.
-
-    args:
-        inspiral_module (obj): Class object representing the module
-            for creating the inspiral. This returns the phases and orbital
-            parameters. See :ref:`trajectory-label`.
-        sum_module (obj): Class object representing the module for summing the
-            final waveform from the amplitude and phase information. See
-            :ref:`summation-label`.
-        inspiral_kwargs (dict, optional): Optional kwargs to pass to the
-            inspiral generator. **Important Note**: These kwargs are passed
-            online, not during instantiation like other kwargs here. Default is
-            {}. This is stored as an attribute.
-        sum_kwargs (dict, optional): Optional kwargs to pass to the
-            sum module during instantiation. Default is {}.
-        use_gpu (bool, optional): If True, use GPU resources. Default is False.
-        num_threads (int, optional): Number of parallel threads to use in OpenMP.
-            If :code:`None`, will not set the global variable :code:`OMP_NUM_THREADS`.
-            Default is None.
-
-    """
-
-    def __init__(
-        self,
-        inspiral_module,
-        sum_module,
-        inspiral_kwargs={},
-        sum_kwargs={},
-        use_gpu=False,
-        num_threads=None,
-    ):
-        ParallelModuleBase.__init__(self, use_gpu=use_gpu, num_threads=num_threads)
-        Pn5AAK.__init__(self)
-
-        sum_kwargs = self.adjust_gpu_usage(use_gpu, sum_kwargs)
-
-        # kwargs that are passed to the inspiral call function
-        self.inspiral_kwargs = inspiral_kwargs
-
-        # function for generating the inpsiral
-        self.inspiral_generator = inspiral_module(**inspiral_kwargs)
-
-        # summation generator
-        self.create_waveform = sum_module(**sum_kwargs)
-
-    def attributes_AAKWaveform(self):
-        """
-        attributes:
-            inspiral_generator (obj): instantiated trajectory module.
-            create_waveform (obj): instantiated summation module.
-            inspiral_kwargs (dict): Kwargs related to the inspiral.
-            xp (obj): numpy or cupy based on gpu usage.
-            num_modes_kept/nmodes (int): Number of modes for final waveform.
-                For this model, it is solely determined from the
-                eccentricity.
-
-
-        """
-        pass
-
-    @property
-    def citation(self):
-        """Return citations related to this module"""
-        return (
-            larger_few_citation
-            + few_citation
-            + few_software_citation
-            + fd_citation
-            + AAK_citation_1
-            + AAK_citation_2
-            + AK_citation
-            + kerr_separatrix_citation
-        )
-
-    @property
-    def gpu_capability(self):
-        return True
-
-    @property
-    def is_source_frame(self):
-        return False
-
-    @property
-    def allow_batching(self):
-        return False
-
-    def __call__(
-        self,
-        M,
-        mu,
-        a,
-        p0,
-        e0,
-        Y0,
-        dist,
-        qS,
-        phiS,
-        qK,
-        phiK,
-        *args,
-        Phi_phi0=0.0,
-        Phi_theta0=0.0,
-        Phi_r0=0.0,
-        mich=False,
-        dt=10.0,
-        T=1.0,
-    ):
-        """Call function for AAK + 5PN model.
-
-        This function will take input parameters and produce AAK waveforms with 5PN trajectories in generic Kerr.
-
-        args:
-            M (double): Mass of larger black hole in solar masses.
-            mu (double): Mass of compact object in solar masses.
-            a (double): Dimensionless spin of massive black hole.
-            p0 (double): Initial semilatus rectum (Must be greater than
-                the separatrix at the the given e0 and Y0).
-                See documentation for more information.
-            e0 (double): Initial eccentricity.
-            Y0 (double): Initial cosine of :math:`\iota`. :math:`Y=\cos{\iota}\equiv L_z/\sqrt{L_z^2 + Q}`
-                in the semi-relativistic formulation.
-            dist (double): Luminosity distance in Gpc.
-            qS (double): Sky location polar angle in ecliptic
-                coordinates.
-            phiS (double): Sky location azimuthal angle in
-                ecliptic coordinates.
-            qK (double): Initial BH spin polar angle in ecliptic
-                coordinates.
-            phiK (double): Initial BH spin azimuthal angle in
-                ecliptic coordinates.
-            *args (tuple, optional): Any additional arguments required for the
-                trajectory.
-            Phi_phi0 (double, optional): Initial phase for :math:`\Phi_\phi`.
-                Default is 0.0.
-            Phi_theta0 (double, optional): Initial phase for :math:`\Phi_\Theta`.
-                Default is 0.0.
-            Phi_r0 (double, optional): Initial phase for :math:`\Phi_r`.
-                Default is 0.0.
-            mich (bool, optional): If True, produce waveform with
-                long-wavelength response approximation (hI, hII). Please
-                note this is not TDI. If False, return hplus and hcross.
-                Default is False.
-            dt (double, optional): Time between samples in seconds
-                (inverse of sampling frequency). Default is 10.0.
-            T (double, optional): Total observation time in years.
-                Default is 1.0.
-
-        Returns:
-            1D complex128 xp.ndarray: The output waveform.
-
-        Raises:
-            ValueError: user selections are not allowed.
-
-        """
-
-        # makes sure angular extrinsic parameters are allowable
-        qS, phiS, qK, phiK = self.sanity_check_angles(qS, phiS, qK, phiK)
-
-        self.sanity_check_init(M, mu, a, p0, e0, Y0)
-
-        # get trajectory
-        t, p, e, Y, Phi_phi, Phi_theta, Phi_r = self.inspiral_generator(
-            M,
-            mu,
-            a,
-            p0,
-            e0,
-            Y0,
-            *args,
-            Phi_phi0=Phi_phi0,
-            Phi_theta0=Phi_theta0,
-            Phi_r0=Phi_r0,
-            T=T,
-            dt=dt,
-            **self.inspiral_kwargs,
-        )
-
-        # makes sure p, Y, and e are generally within the model
-        self.sanity_check_traj(p, e, Y)
-
-        self.end_time = t[-1]
-
-        # number of modes to use (from original AAK model)
-        self.num_modes_kept = self.nmodes = int(30 * e0)
-        if self.num_modes_kept < 4:
-            self.num_modes_kept = self.nmodes = 4
-
-        waveform = self.create_waveform(
-            t,
-            M,
-            a,
-            p,
-            e,
-            Y,
-            dist,
-            Phi_phi,
-            Phi_theta,
-            Phi_r,
-            mu,
-            qS,
-            phiS,
-            qK,
-            phiK,
-            self.nmodes,
-            mich=mich,
-            dt=dt,
-            T=T,
-        )
-
-        return waveform
-
-
-class Pn5AAKWaveform(AAKWaveformBase, Pn5AAK, ParallelModuleBase, ABC):
-    """Waveform generation class for AAK with 5PN trajectory.
-
-    This class generates waveforms based on the Augmented Analytic Kludge
-    given in the
-    `EMRI Kludge Suite <https://github.com/alvincjk/EMRI_Kludge_Suite/>`_.
-    However, here the trajectory is vastly improved by employing the 5PN
-    fluxes for generic Kerr orbits from
-    `Fujita & Shibata 2020 <https://arxiv.org/abs/2008.13554>`_.
-
-    The 5PN trajectory produces orbital and phase trajectories.
-    The trajectory is calculated until the orbit reaches
-    within 0.2 of the separatrix, determined from
-    `arXiv:1912.07609 <https://arxiv.org/abs/1912.07609/>`_. The
-    fundamental frequencies along the trajectory at each point are then
-    calculated from the orbital parameters and the spin value given by (`Schmidt 2002 <https://arxiv.org/abs/gr-qc/0202090>`_).
-
-    These frequencies along the trajectory are then used to map to the
-    frequency basis of the `Analytic Kludge <https://arxiv.org/abs/gr-qc/0310125>`_. This mapping
-    takes the form of time evolving large mass and spin parameters, as
-    well as the use of phases and frequencies in
-    :math:`(alpha, \Phi, \gamma)`:
-
-    .. math:: \Phi = \Phi_\phi,
-
-    .. math:: \gamma = \Phi_\phi + \Phi_\Theta,
-
-    .. math:: alpha = \Phi_\phi + \Phi_\Theta + \Phi_r.
-
-    The frequencies in that basis are found by taking the time derivatives
-    of each equation above.
-
-    This class has GPU capabilities and works from the sparse trajectory
-    methodoligy with cubic spine interpolation of the smoothly varying
-    waveform quantities. This waveform does not have the freedom in terms
-    of user-chosen quantitites that
-    :class:`few.waveform.SchwarzschildEccentricWaveformBase` contains.
-    This is mainly due to the specific waveform constructions particular
-    to the AAK/AK.
-
-    **Please note:** the 5PN trajectory and AAK waveform take the parameter
-    :math:`Y\equiv\cos{\iota}=L/\sqrt{L^2 + Q}` rather than :math:`x_I` as is accepted
-    for relativistic waveforms and in the generic waveform interface discussed above.
-    The generic waveform interface directly converts :math:`x_I` to :math:`Y`.
-
-    args:
-        inspiral_kwargs (dict, optional): Optional kwargs to pass to the
-            inspiral generator. **Important Note**: These kwargs are passed
-            online, not during instantiation like other kwargs here. Default is
-            {}. This is stored as an attribute.
-        sum_kwargs (dict, optional): Optional kwargs to pass to the
-            sum module during instantiation. Default is {}.
-        use_gpu (bool, optional): If True, use GPU resources. Default is False.
-        num_threads (int, optional): Number of parallel threads to use in OpenMP.
-            If :code:`None`, will not set the global variable :code:`OMP_NUM_THREADS`.
-            Default is None.
-
-    """
-
-    def __init__(
-        self, inspiral_kwargs={}, sum_kwargs={}, use_gpu=False, num_threads=None
-    ):
-        inspiral_kwargs["func"] = "pn5"
-
-        AAKWaveformBase.__init__(
-            self,
-            EMRIInspiral,
-            AAKSummation,
-            inspiral_kwargs=inspiral_kwargs,
-            sum_kwargs=sum_kwargs,
-            use_gpu=use_gpu,
-            num_threads=num_threads,
-        )
-
-    def attributes_Pn5AAKWaveform(self):
-        """
-        attributes:
-            inspiral_generator (obj): instantiated trajectory module.
-            create_waveform (obj): instantiated summation module.
-            inspiral_kwargs (dict): Kwargs related to the inspiral class:
-                :class:`few.trajectory.pn5.RunKerrGenericPn5Inspiral`.
-            xp (obj): numpy or cupy based on gpu usage.
-            num_modes_kept/nmodes (int): Number of modes for final waveform.
-                For this model, it is solely determined from the
-                eccentricity.
-
-
-        """
-        pass
-
-    @property
-    def citation(self):
-        """Return citations related to this module"""
-        return (
-            larger_few_citation
-            + few_citation
-            + few_software_citation
-            + fd_citation
-            + AAK_citation_1
-            + AAK_citation_2
-            + AK_citation
-            + Pn5_citation
-            + kerr_separatrix_citation
-        )
-
-
-
-
 

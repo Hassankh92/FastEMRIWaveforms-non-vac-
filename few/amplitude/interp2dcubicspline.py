@@ -23,15 +23,10 @@ import h5py
 import numpy as np
 
 # Cython/C++ imports
-from pyInterp2DAmplitude import pyAmplitudeGenerator, pyAmplitudeGenerator_Kerr
+from pyInterp2DAmplitude import pyAmplitudeGenerator, pyAmplitudeGenerator_Kerr 
 
 # Python imports
-from few.utils.baseclasses import (
-    SchwarzschildEccentric,
-    AmplitudeBase,
-    AmplitudeBaseKerrCircular,
-    KerrCircular,
-)
+from few.utils.baseclasses import SchwarzschildEccentric, AmplitudeBase, AmplitudeBase_Kerr, KerrCircular
 from few.utils.utility import check_for_file_download
 from few.utils.citations import *
 
@@ -68,6 +63,7 @@ class Interp2DAmplitude(AmplitudeBase, SchwarzschildEccentric):
 
         fp = "Teuk_amps_a0.0_lmax_10_nmax_30_new.h5"
         check_for_file_download(fp, few_dir)
+
 
         self.amplitude_generator = pyAmplitudeGenerator(self.lmax, self.nmax, few_dir)
 
@@ -148,6 +144,14 @@ class Interp2DAmplitude(AmplitudeBase, SchwarzschildEccentric):
 
             inds_revert = np.asarray(inds_revert)
 
+        
+        try:  # move to CPU if needed before feeding in
+            p, e =  p.get(), e.get()
+        except AttributeError:
+            pass
+
+
+
         # interface to C++
         teuk_modes = self.amplitude_generator(
             p,
@@ -158,6 +162,7 @@ class Interp2DAmplitude(AmplitudeBase, SchwarzschildEccentric):
             input_len,
             len(l_arr),
         )
+
 
         # determine return quantities
 
@@ -177,6 +182,9 @@ class Interp2DAmplitude(AmplitudeBase, SchwarzschildEccentric):
                     temp[lmn] = np.conj(temp[lmn])
 
             return temp
+
+
+
 
 
 class Interp2DAmplitudeKerrCircular(AmplitudeBaseKerrCircular, KerrCircular):

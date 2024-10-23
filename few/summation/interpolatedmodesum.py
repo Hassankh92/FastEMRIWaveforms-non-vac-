@@ -21,10 +21,10 @@ import numpy as np
 
 # try to import cupy
 try:
-    import cupy as cp
+    import cupy as xp
 
 except (ImportError, ModuleNotFoundError) as e:
-    import numpy as np
+    import numpy as xp
 
 # Cython imports
 from pyinterp_cpu import interpolate_arrays_wrap as interpolate_arrays_wrap_cpu
@@ -76,6 +76,7 @@ class CubicSplineInterpolant(ParallelModuleBase):
     """
 
     def __init__(self, t, y_all, **kwargs):
+
         ParallelModuleBase.__init__(self, **kwargs)
 
         if self.use_gpu:
@@ -84,12 +85,7 @@ class CubicSplineInterpolant(ParallelModuleBase):
         else:
             self.interpolate_arrays = interpolate_arrays_wrap_cpu
 
-        if self.use_gpu:
-            xp = cp
-        else:
-            xp = np
-
-        y_all = xp.atleast_2d(y_all)
+        y_all = self.xp.atleast_2d(y_all)
 
         # hardcoded,only cubic spline is available
         self.degree = 3
@@ -102,7 +98,7 @@ class CubicSplineInterpolant(ParallelModuleBase):
         self.reshape_shape = (self.degree + 1, ninterps, length)
 
         # interp array is (y, c1, c2, c3)
-        interp_array = xp.zeros(self.reshape_shape)
+        interp_array = self.xp.zeros(self.reshape_shape)
 
         # fill y
         interp_array[0] = y_all
@@ -110,17 +106,17 @@ class CubicSplineInterpolant(ParallelModuleBase):
         interp_array = interp_array.flatten()
 
         # arrays to store banded matrix and solution
-        B = xp.zeros((ninterps * length,))
-        upper_diag = xp.zeros_like(B)
-        diag = xp.zeros_like(B)
-        lower_diag = xp.zeros_like(B)
+        B = self.xp.zeros((ninterps * length,))
+        upper_diag = self.xp.zeros_like(B)
+        diag = self.xp.zeros_like(B)
+        lower_diag = self.xp.zeros_like(B)
 
         if t.ndim == 1:
             if len(t) < 2:
                 raise ValueError("t must have length greater than 2.")
 
             # could save memory by adjusting c code to treat 1D differently
-            self.t = xp.tile(t, (ninterps, 1)).flatten().astype(xp.float64)
+            self.t = self.xp.tile(t, (ninterps, 1)).flatten().astype(xp.float64)
 
         elif t.ndim == 2:
             if t.shape[1] < 2:
@@ -133,19 +129,12 @@ class CubicSplineInterpolant(ParallelModuleBase):
 
         # perform interpolation
         self.interpolate_arrays(
-            self.t,
-            interp_array,
-            ninterps,
-            length,
-            B,
-            upper_diag,
-            diag,
-            lower_diag,
+            self.t, interp_array, ninterps, length, B, upper_diag, diag, lower_diag,
         )
 
         # set up storage of necessary arrays
 
-        self.interp_array = xp.transpose(
+        self.interp_array = self.xp.transpose(
             interp_array.reshape(self.reshape_shape), [0, 2, 1]
         ).flatten()
 
@@ -196,16 +185,11 @@ class CubicSplineInterpolant(ParallelModuleBase):
     def _get_inds(self, tnew):
         # find were in the old t array the new t values split
 
-        if self.use_gpu:
-            xp = cp
-        else:
-            xp = np
-
-        inds = xp.zeros((self.ninterps, tnew.shape[1]), dtype=int)
+        inds = self.xp.zeros((self.ninterps, tnew.shape[1]), dtype=int)
 
         # Optional TODO: remove loop ? if speed needed
         for i, (t, tnew_i) in enumerate(zip(self.t, tnew)):
-            inds[i] = xp.searchsorted(t, tnew_i, side="right") - 1
+            inds[i] = self.xp.searchsorted(t, tnew_i, side="right") - 1
 
             # fix end value
             inds[i][tnew_i == t[-1]] = len(t) - 2
@@ -245,24 +229,20 @@ class CubicSplineInterpolant(ParallelModuleBase):
             xp.ndarray: 1D or 2D array of evaluated spline values (or derivatives).
 
         """
-        if self.use_gpu:
-            xp = cp
-        else:
-            xp = np
 
-        tnew = xp.atleast_1d(tnew)
+        tnew = self.xp.atleast_1d(tnew)
 
         if tnew.ndim == 2:
             if tnew.shape[0] != self.t.shape[0]:
                 raise ValueError(
-                    "If providing a 2D tnew array, must have same number of interpolants as was entered during initialization."
+                    "If providing a 2D tnew array, must have some number of interpolants as was entered during initialization."
                 )
 
         # copy input to all splines
         elif tnew.ndim == 1:
-            tnew = xp.tile(tnew, (self.t.shape[0], 1))
+            tnew = self.xp.tile(tnew, (self.t.shape[0], 1))
 
-        tnew = xp.atleast_2d(tnew)
+        tnew = self.xp.atleast_2d(tnew)
 
         # get indices into spline
         inds, inds_bad_left, inds_bad_right = self._get_inds(tnew)
@@ -297,17 +277,17 @@ class CubicSplineInterpolant(ParallelModuleBase):
         if deriv_order == 0:
             out = y + c1 * x + c2 * x2 + c3 * x3
             # fix bad values
-            if xp.any(inds_bad_left):
-                temp = xp.tile(self.y[:, 0], (tnew.shape[1], 1)).T
+            if self.xp.any(inds_bad_left):
+                temp = self.xp.tile(self.y[:, 0], (tnew.shape[1], 1)).T
                 out[inds_bad_left] = temp[inds_bad_left]
 
-            if xp.any(inds_bad_right):
-                temp = xp.tile(self.y[:, -1], (tnew.shape[1], 1)).T
+            if self.xp.any(inds_bad_right):
+                temp = self.xp.tile(self.y[:, -1], (tnew.shape[1], 1)).T
                 out[inds_bad_right] = temp[inds_bad_right]
 
         else:
             # derivatives
-            if xp.any(inds_bad_right) or xp.any(inds_bad_left):
+            if self.xp.any(inds_bad_right) or self.xp.any(inds_bad_left):
                 raise ValueError(
                     "x points outside of the domain of the spline are not supported when taking derivatives."
                 )
@@ -335,6 +315,7 @@ class InterpolatedModeSum(SummationBase, SchwarzschildEccentric, ParallelModuleB
     """
 
     def __init__(self, *args, **kwargs):
+
         ParallelModuleBase.__init__(self, *args, **kwargs)
         SchwarzschildEccentric.__init__(self, *args, **kwargs)
         SummationBase.__init__(self, *args, **kwargs)
@@ -403,18 +384,13 @@ class InterpolatedModeSum(SummationBase, SchwarzschildEccentric, ParallelModuleB
 
         """
 
-        if self.use_gpu:
-            xp = cp
-        else:
-            xp = np
-
         init_len = len(t)
         num_teuk_modes = teuk_modes.shape[1]
         num_pts = self.num_pts
 
         length = init_len
         ninterps = self.ndim + 2 * num_teuk_modes  # 2 for re and im
-        y_all = xp.zeros((ninterps, length))
+        y_all = self.xp.zeros((ninterps, length))
 
         y_all[:num_teuk_modes] = teuk_modes.T.real
         y_all[num_teuk_modes : 2 * num_teuk_modes] = teuk_modes.T.imag
@@ -432,7 +408,7 @@ class InterpolatedModeSum(SummationBase, SchwarzschildEccentric, ParallelModuleB
         if not self.use_gpu:
             dev = 0
         else:
-            dev = int(xp.cuda.runtime.getDevice())
+            dev = int(self.xp.cuda.runtime.getDevice())
 
         # the base class function __call__ will return the waveform
         self.get_waveform(
@@ -446,8 +422,15 @@ class InterpolatedModeSum(SummationBase, SchwarzschildEccentric, ParallelModuleB
             ylms,
             dt,
             h_t,
-            dev,
+            dev
         )
+
+
+
+
+
+
+
 
 
 class InterpolatedModeSumKerrCircular(SummationBase, KerrCircular, ParallelModuleBase):

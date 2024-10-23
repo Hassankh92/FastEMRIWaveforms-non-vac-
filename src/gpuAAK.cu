@@ -105,6 +105,10 @@ void make_waveform(cmplx *waveform,
       start = 0;
       end = 4 * NUM_PARS;
       increment = 1;
+
+      #ifdef __USE_OMP__
+      #pragma omp parallel for
+      #endif  // __USE_OMP__
       #endif // __CUDACC__
 
        // prepare interpolants
@@ -183,6 +187,9 @@ void make_waveform(cmplx *waveform,
       end = end_ind;
       increment = 1;
 
+      #ifdef __USE_OMP__
+      #pragma omp parallel for
+      #endif
       #endif
       for (int i = start; i < end; i += increment)
       {
@@ -240,7 +247,8 @@ void make_waveform(cmplx *waveform,
           double Ldotn2=Ldotn*Ldotn;
           double Sdotn=cosqK*cosqS+sinqK*sinqS*cos(phiK-phiS);
           double beta;
-          if (S_phys == 0.0)
+          // if (S_phys == 0.0)
+          if (S_phys == 0.0 || alp == 0.0 || lam == 0.0)
           {
               beta = 0.0;
           }
@@ -429,6 +437,9 @@ void get_waveform(cmplx *waveform, double* interp_array,
 
     #endif
 
+    #ifdef __USE_OMP__
+    #pragma omp parallel for
+    #endif
     for (int i = 0; i < number_of_old_spline_points-1; i++) {
           #ifdef __CUDACC__
 
@@ -464,6 +475,9 @@ void get_waveform(cmplx *waveform, double* interp_array,
       cudaDeviceSynchronize();
       gpuErrchk(cudaGetLastError());
 
+      #ifdef __USE_OMP__
+      #pragma omp parallel for
+      #endif
       for (int i = 0; i < number_of_old_spline_points-1; i++) {
             //destroy the streams
             cudaStreamDestroy(streams[i]);

@@ -26,9 +26,12 @@
 #include "dIdt8H_5PNe10.h"
 #include "ode.hh"
 
+
+
 #define pn5_Y
 #define pn5_citation1 Pn5_citation
-__deriv__ void pn5(double *pdot, double *edot, double *Ydot,
+__deriv__
+void pn5(double* pdot, double *edot, double *Ydot,
                    double *Omega_phi, double *Omega_theta, double *Omega_r,
                    double epsilon, double a, double p, double e, double Y, double *additional_args)
 {
@@ -115,7 +118,8 @@ SchwarzEccFlux::SchwarzEccFlux(std::string few_dir)
 #define SchwarzEccFlux_spinless
 #define SchwarzEccFlux_equatorial
 #define SchwarzEccFlux_file1 FluxNewMinusPNScaled_fixed_y_order.dat
-__deriv__ void SchwarzEccFlux::deriv_func(double *pdot, double *edot, double *xdot,
+__deriv__
+void SchwarzEccFlux::deriv_func(double *pdot, double *edot, double *xdot,
                                           double *Omega_phi, double *Omega_theta, double *Omega_r,
                                           double epsilon, double a, double p, double e, double x, double *additional_args)
 {
@@ -235,7 +239,8 @@ double KerrCircFlux::EdotPN(double r, double a)
 #define KerrCircFlux_equatorial
 #define KerrCircFlux_circular
 #define KerrCircFlux_file1 Kerr_flux_minus_PN1_kerr_circ.dat
-__deriv__ void KerrCircFlux::deriv_func(double *pdot, double *edot, double *xdot,
+__deriv__
+void KerrCircFlux::deriv_func(double *pdot, double *edot, double *xdot,
                                                        double *Omega_phi, double *Omega_theta, double *Omega_r,
                                                        double epsilon, double a, double p, double e, double x, double *additional_args)
 {

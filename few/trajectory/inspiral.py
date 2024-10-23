@@ -25,7 +25,7 @@ import numpy as np
 from scipy.interpolate import CubicSpline
 
 # Cython/C++ imports
-from pyInspiral import pyInspiralGenerator
+from pyInspiral import pyInspiralGenerator, pyDerivative
 
 # Python imports
 from few.utils.baseclasses import TrajectoryBase
@@ -105,14 +105,8 @@ class EMRIInspiral(TrajectoryBase):
         ValueError: File necessary for ODE not found.
     """
 
-    def __init__(
-        self,
-        *args,
-        func=None,
-        enforce_schwarz_sep=False,
-        test_new_version=True,
-        **kwargs,
-    ):
+    def __init__(self, *args, func=None, enforce_schwarz_sep=False, **kwargs):
+
         few_dir = dir_path + "/../../"
 
         if func is None:
@@ -142,18 +136,13 @@ class EMRIInspiral(TrajectoryBase):
                     f"File required for this ODE ({fp}) was not found in the proper folder ({few_dir + 'few/files/'}) or on zenodo."
                 )
 
-        self.test_new_version = test_new_version
-        if test_new_version:
-            self.inspiral_generator = pyInspiralGenerator(
-                func.encode("utf-8"),
-                enforce_schwarz_sep,
-                self.num_add_args,
-                self.convert_Y,
-                few_dir.encode("utf-8"),
-            )
-        else:
-            raise ValueError
-        
+        self.inspiral_generator = pyInspiralGenerator(
+            func,
+            enforce_schwarz_sep,
+            self.num_add_args,
+            self.convert_Y,
+            few_dir.encode(),
+        )
 
         self.func = func
 
@@ -165,6 +154,8 @@ class EMRIInspiral(TrajectoryBase):
             "max_init_len",
             "use_rk4",
         ]
+
+        self.get_derivative = pyDerivative(self.func, few_dir.encode())
 
     def attributes_EMRIInspiral(self):
         """
@@ -228,7 +219,7 @@ class EMRIInspiral(TrajectoryBase):
             Phi_r0 (double, optional): Initial phase for :math:`\Phi_r`.
                 Default is 0.0.
             **kwargs (dict, optional): kwargs passed from parent.
-
+            
         Returns:
             tuple: Tuple of (t, p, e, x, Phi_phi, Phi_theta, Phi_r).
 
@@ -240,13 +231,13 @@ class EMRIInspiral(TrajectoryBase):
 
         if self.background == "Schwarzschild":
             a = 0.0
-        elif a < fill_value:
-            warnings.warn(
-                "Our model with spin breaks near a = 0. Adjusting to a = 1e-6.".format(
-                    fill_value
-                )
-            )
-            a = fill_value
+        # elif a < fill_value:
+        #     warnings.warn(
+        #         "Our model with spin breaks near a = 0. Adjusting to a = 1e-6.".format(
+        #             fill_value
+        #         )
+        #     )
+        #     a = fill_value
 
         if self.equatorial:
             x0 = 1.0

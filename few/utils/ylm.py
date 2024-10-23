@@ -17,9 +17,9 @@
 
 # test import of cupy
 try:
-    import cupy as cp
+    import cupy as xp
 except (ImportError, ModuleNotFoundError) as e:
-    pass
+    import numpy as xp
 
 import numpy as np
 
@@ -49,6 +49,7 @@ class GetYlms(ParallelModuleBase):
     """
 
     def __init__(self, assume_positive_m=False, **kwargs):
+
         ParallelModuleBase.__init__(self, **kwargs)
         # see args in docstring
         self.assume_positive_m = assume_positive_m
@@ -83,16 +84,11 @@ class GetYlms(ParallelModuleBase):
 
         """
 
-        if self.use_gpu:
-            xp = cp
-        else:
-            xp = np
-
         # if assuming positive m, repeat entries for negative m
         # this will duplicate m = 0
         if self.assume_positive_m:
-            l = xp.zeros(2 * l_in.shape[0], dtype=int)
-            m = xp.zeros(2 * l_in.shape[0], dtype=int)
+            l = self.xp.zeros(2 * l_in.shape[0], dtype=int)
+            m = self.xp.zeros(2 * l_in.shape[0], dtype=int)
 
             l[: l_in.shape[0]] = l_in
             l[l_in.shape[0] :] = l_in
@@ -114,8 +110,10 @@ class GetYlms(ParallelModuleBase):
         except AttributeError:
             pass
 
+
+
         # get ylm arrays and cast back to cupy if using cupy/GPUs
-        return xp.asarray(
+        return self.xp.asarray(
             get_spin_weighted_spher_harm_wrap(
                 l.astype(np.int32), m.astype(np.int32), theta, phi
             )

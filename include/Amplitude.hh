@@ -23,7 +23,7 @@
 #include <sstream>
 #include <vector>
 #include <chrono>
-#include <iomanip> // std::setprecision
+#include <iomanip>      // std::setprecision
 
 #include <omp.h>
 #include <stdio.h>
@@ -33,14 +33,12 @@ using namespace std;
 using namespace std::chrono;
 
 // The 11 below means the lmax = 10
-struct waveform_amps
-{
-    Interpolant ***re[11];
-    Interpolant ***im[11];
+struct waveform_amps{
+	Interpolant ***re[11];
+	Interpolant ***im[11];
 };
 
-class AmplitudeCarrier
-{
+class AmplitudeCarrier{
 public:
     struct waveform_amps *amps;
     int lmax, nmax;
@@ -51,16 +49,16 @@ public:
     void dealloc();
 };
 
+
+
 // The 31 below means the lmax = 30
 
-struct waveform_amps_Kerr
-{
-    Interpolant ***re[31];
-    Interpolant ***im[31];
+struct waveform_amps_Kerr{
+	Interpolant ***re[31];
+	Interpolant ***im[31];
 };
 
-class AmplitudeCarrier_Kerr
-{
+class AmplitudeCarrier_Kerr{
 public:
     struct waveform_amps_Kerr *amps;
     int lmax, nmax;
@@ -70,5 +68,6 @@ public:
 
     void dealloc();
 };
+
 
 #endif //__AMPLITUDE_H__

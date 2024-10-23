@@ -42,6 +42,18 @@ cdef class pyAmplitudeGenerator:
         return amplitude_out.reshape(input_len, num_modes)
 
 
+
+
+
+
+# for ************* Kerr
+
+
+
+
+
+
+
 cdef extern from "Amplitude.hh":
     cdef cppclass AmplitudeCarrierWrap_Kerr "AmplitudeCarrier_Kerr":
         AmplitudeCarrierWrap_Kerr(int lmax_, int nmax_, string few_dir)

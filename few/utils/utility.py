@@ -20,8 +20,6 @@ import requests
 import os
 import subprocess
 import warnings
-import zipfile
-
 
 import numpy as np
 from scipy.interpolate import CubicSpline
@@ -32,6 +30,9 @@ from pyUtility import (
     pyGetSeparatrix,
     pyKerrGeoConstantsOfMotionVectorized,
     pyY_to_xI_vector,
+    set_threads_wrap,
+    get_threads_wrap,
+    pyKerrEqSpinFrequenciesCorr
 )
 
 # check to see if cupy is available for gpus
@@ -189,7 +190,7 @@ def get_fundamental_frequencies(a, p, e, x):
             These are 1D arrays or scalar values depending on inputs.
 
     """
-
+    # breakpoint()
     # check if inputs are scalar or array
     if isinstance(p, float):
         scalar = True
@@ -220,6 +221,63 @@ def get_fundamental_frequencies(a, p, e, x):
 
     else:
         return (OmegaPhi, OmegaTheta, OmegaR)
+
+
+def get_fundamental_frequencies_spin_corrections(a, p, e, x):
+    """Get dimensionless fundamental frequencies.
+
+    Determines fundamental frequencies in generic Kerr from
+    `Schmidt 2002 <https://arxiv.org/abs/gr-qc/0202090>`_.
+
+    arguments:
+        a (double scalar or 1D np.ndarray): Dimensionless spin of massive
+            black hole. If other parameters are arrays and the spin is scalar,
+            it will be cast to a 1D array.
+        p (double scalar or 1D double np.ndarray): Values of separation,
+            :math:`p`.
+        e (double scalar or 1D double np.ndarray): Values of eccentricity,
+            :math:`e`.
+        x (double scalar or 1D double np.ndarray): Values of cosine of the
+            inclination, :math:`x=\cos{I}`. Please note this is different from
+            :math:`Y=\cos{\iota}`.
+
+    returns:
+        tuple: Tuple of (OmegaPhi, OmegaTheta, OmegaR).
+            These are 1D arrays or scalar values depending on inputs.
+
+    """
+
+    # check if inputs are scalar or array
+    if isinstance(p, float):
+        scalar = True
+
+    else:
+        scalar = False
+
+    p_in = np.atleast_1d(p)
+    e_in = np.atleast_1d(e)
+    x_in = np.atleast_1d(x)
+
+    # cast the spin to the same size array as p
+    if isinstance(a, float):
+        a_in = np.full_like(p_in, a)
+    else:
+        a_in = np.atleast_1d(a)
+
+    assert len(a_in) == len(p_in)
+
+    # get frequencies
+    OmegaPhi, OmegaTheta, OmegaR = pyKerrEqSpinFrequenciesCorr(
+        a_in, p_in, e_in, x_in
+    )
+
+    # set output to shape of input
+    if scalar:
+        return (OmegaPhi[0], OmegaTheta[0], OmegaR[0])
+
+    else:
+        return (OmegaPhi, OmegaTheta, OmegaR)
+
 
 
 def get_kerr_geo_constants_of_motion(a, p, e, x):
@@ -302,7 +360,7 @@ def xI_to_Y(a, p, e, x):
     # get constants of motion
     E, L, Q = get_kerr_geo_constants_of_motion(a, p, e, x)
 
-    Y = L / np.sqrt(L**2 + Q)
+    Y = L / np.sqrt(L ** 2 + Q)
     return Y
 
 
@@ -331,7 +389,6 @@ def Y_to_xI(a, p, e, Y):
 
     """
 
-    # TODO: check error for not c-contiguous
     # determines shape of input
     if isinstance(e, float):
         scalar = True
@@ -400,11 +457,6 @@ def get_separatrix(a, e, x):
         a_in = np.full_like(e_in, a)
     else:
         a_in = np.atleast_1d(a)
-
-    if isinstance(x, float):
-        x_in = np.full_like(e_in, x)
-    else:
-        x_in = np.atleast_1d(x)
 
     assert len(a_in) == len(e_in) == len(x_in)
 
@@ -481,6 +533,7 @@ def get_mu_at_t(
     t_end = np.zeros_like(mu_new)
 
     for i, mu in enumerate(mu_new):
+
         # insert mu into args list
         args_new = traj_args.copy()
         args_new.insert(index_of_mu, mu)
@@ -662,12 +715,7 @@ def get_p_at_t(
 
 
 def get_mu_at_t(
-    traj_module,
-    t_out,
-    traj_args,
-    index_of_mu=1,
-    bounds=None,
-    **kwargs,
+    traj_module, t_out, traj_args, index_of_mu=1, bounds=None, **kwargs,
 ):
     """Find the value of mu that will give a specific length inspiral using Brent's method.
 
@@ -714,40 +762,39 @@ def get_mu_at_t(
 
 
 # data history is saved here nased on version nunber
-# record_by_version = {
-#     "1.0.0": 3981654,
-#     "1.1.0": 3981654,
-#     "1.1.1": 3981654,
-#     "1.1.2": 3981654,
-#     "1.1.3": 3981654,
-#     "1.1.4": 3981654,
-#     "1.1.5": 3981654,
-#     "1.2.0": 3981654,
-#     "1.2.1": 3981654,
-#     "1.2.2": 3981654,
-#     "1.3.0": 3981654,
-#     "1.3.1": 3981654,
-#     "1.3.2": 3981654,
-#     "1.3.3": 3981654,
-#     "1.3.4": 3981654,
-#     "1.3.5": 3981654,
-#     "1.3.6": 3981654,
-#     "1.3.7": 3981654,
-#     "1.4.0": 3981654,
-#     "1.4.1": 3981654,
-#     "1.4.2": 3981654,
-#     "1.4.3": 3981654,
-#     "1.4.4": 3981654,
-#     "1.4.5": 3981654,
-#     "1.4.6": 3981654,
-#     "1.4.7": 3981654,
-#     "1.4.8": 3981654,
-#     "1.4.9": 3981654,
-#     "1.4.10": 3981654,
-#     "1.4.11": 3981654,
-#     "1.5.0": 3981654,
-#     "1.5.1": 3981654,
-# }
+record_by_version = {
+    "1.0.0": 3981654,
+    "1.1.0": 3981654,
+    "1.1.1": 3981654,
+    "1.1.2": 3981654,
+    "1.1.3": 3981654,
+    "1.1.4": 3981654,
+    "1.1.5": 3981654,
+    "1.2.0": 3981654,
+    "1.2.1": 3981654,
+    "1.2.2": 3981654,
+    "1.3.0": 3981654,
+    "1.3.1": 3981654,
+    "1.3.2": 3981654,
+    "1.3.3": 3981654,
+    "1.3.4": 3981654,
+    "1.3.5": 3981654,
+    "1.3.6": 3981654,
+    "1.3.7": 3981654,
+    "1.4.0": 3981654,
+    "1.4.1": 3981654,
+    "1.4.2": 3981654,
+    "1.4.3": 3981654,
+    "1.4.4": 3981654,
+    "1.4.5": 3981654,
+    "1.4.6": 3981654,
+    "1.4.7": 3981654,
+    "1.4.8": 3981654,
+    "1.4.9": 3981654,
+    "1.4.10": 3981654,
+    "1.4.11": 3981654,
+}
+
 
 
 def check_for_file_download(fp, few_dir, version_string=None):
@@ -829,9 +876,6 @@ def check_for_file_download(fp, few_dir, version_string=None):
             os.remove(few_dir + "temp_folder.zip")
 
         os.rename(fp, few_dir + "few/files/" + fp)
-
-
-
 
 
 
@@ -930,6 +974,24 @@ def pointer_adjust(func):
         return func(*targs, **tkwargs)
 
     return func_wrapper
+
+
+def omp_set_num_threads(num_threads=1):
+    """Globally sets OMP_NUM_THREADS
+
+    Args:
+        num_threads (int, optional):
+        Number of parallel threads to use in OpenMP.
+            Default is 1.
+
+    """
+    set_threads_wrap(num_threads)
+
+
+def omp_get_num_threads():
+    """Get global variable OMP_NUM_THREADS"""
+    num_threads = get_threads_wrap()
+    return num_threads
 
 
 def cuda_set_device(dev):

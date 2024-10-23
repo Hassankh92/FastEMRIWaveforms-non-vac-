@@ -1,14 +1,7 @@
 import numpy as np
 cimport numpy as np
 
-from few.utils.utility import wrapper
-
-try: 
-    import cupy as cp
-    gpu = True
-except (ModuleNotFoundError, ImportError) as e:
-    gpu = False
-
+from few.utils.utility import pointer_adjust
 
 assert sizeof(int) == sizeof(np.int32_t)
 
@@ -19,11 +12,9 @@ cdef extern from "matmul.hh":
                           int input_len, int break_index, double transform_factor_inv,
                           int num_teuk_modes)
 
-def neural_layer_wrap(*args, **kwargs):
-    # this is a special structure for converting pointers
-    targs, tkwargs = wrapper(*args, **kwargs)
-    
-    mat_out, mat_in, weight, bias, m, k, n, run_relu = targs
+
+@pointer_adjust
+def neural_layer_wrap(mat_out, mat_in, weight, bias, m, k, n, run_relu):
 
     cdef size_t mat_out_in = mat_out
     cdef size_t mat_in_in = mat_in
@@ -38,11 +29,10 @@ def neural_layer_wrap(*args, **kwargs):
 
     return
 
-def transform_output_wrap(*args, **kwargs):
-    targs, tkwargs = wrapper(*args, **kwargs)
-    (teuk_modes, transform_matrix, nn_output_mat, C,
+@pointer_adjust
+def transform_output_wrap(teuk_modes, transform_matrix, nn_output_mat, C,
                           input_len, break_index, transform_factor_inv,
-                          num_teuk_modes) = targs
+                          num_teuk_modes):
 
     cdef size_t teuk_modes_in = teuk_modes
     cdef size_t transform_matrix_in = transform_matrix

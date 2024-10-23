@@ -1,53 +1,7 @@
-import shutil
-
-fp_loc = __file__.split("scripts/prebuild.py")[0]
-fp_out_name = fp_loc + "few/utils/constants.py"
-fp_in_name = fp_loc + "include/global.h"
-
-# develop few.utils.constants.py
-with open(fp_out_name, "w") as fp_out:
-    with open(fp_in_name, "r") as fp_in:
-        lines = fp_in.readlines()
-        for line in lines:
-            if len(line.split()) == 3:
-                if line.split()[0] == "#define":
-                    try:
-                        _ = float(line.split()[2])
-                        string_out = line.split()[1] + " = " + line.split()[2] + "\n"
-                        fp_out.write(string_out)
-
-                    except ValueError as e:
-                        continue
-
-# Install cpu versions of gpu modules
-
-# need to copy cuda files to cpp for this special compiler we are using
-# also copy pyx files to cpu version
-src = "src/"
-
-cp_cu_files = ["matmul", "interpolate", "gpuAAK"]
-cp_pyx_files = ["pymatmul", "pyinterp", "gpuAAKWrap"]
-
-for fp in cp_cu_files:
-    shutil.copy(src + fp + ".cu", src + fp + ".cpp")
-
-for fp in cp_pyx_files:
-    shutil.copy(src + fp + ".pyx", src + fp + "_cpu.pyx")
-
-# setup version file
-with open("README.md", "r") as fh:
-    lines = fh.readlines()
-
-for line in lines:
-    if line.startswith("Current Version"):
-        version_string = line.split("Current Version: ")[1].split("\n")[0]
-
-with open("few/_version.py", "w") as f:
-    f.write("__version__ = '{}'".format(version_string))
-
-# prepare the ode files
-
 import os
+
+# get path to this file
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 
 def get_ode_function_lines_names():
@@ -60,11 +14,11 @@ def get_ode_function_lines_names():
             Second entry is dictionary with information on
             available ODE functions.
     """
-    with open(src + "ode_base_example.cc", "r") as fp:
+    with open(dir_path + "/../../src/ode_base_example.cc", "r") as fp:
         lines = fp.readlines()
 
-    if "ode_base.cc" in os.listdir(src):
-        with open(src + "ode_base.cc", "r") as fp:
+    if "ode_base.cc" in os.listdir(dir_path + "/../../src/"):
+        with open(dir_path + "/../../src/ode_base.cc", "r") as fp:
             lines += fp.readlines()
 
     # find derivative functions and get info
@@ -73,23 +27,17 @@ def get_ode_function_lines_names():
         if lines[i][:9] == "__deriv__":
             if lines[i][9] != "\n":
                 line = lines[i]
-                if "::" in line:
-                    name = line.split("::")[0].split(" ")[-1]
-                    func_type = "class"
-
-                else:
-                    name = line.split("(")[0].split(" ")[-1]
-                    func_type = "func"
-
+                name = line.split("(")[0].split(" ")[2]
+                func_type = "func"
             else:
                 line = lines[i + 1]
 
                 if "::" in line:
-                    name = line.split("::")[0].split(" ")[-1]
+                    name = line.split("::")[0].split(" ")[1]
                     func_type = "class"
 
                 else:
-                    name = line.split("(")[0].split(" ")[-1]
+                    name = line.split("(")[0].split(" ")[1]
                     func_type = "func"
 
             functions_info[name] = {"type": func_type, "files": [], "citations": []}
@@ -141,7 +89,7 @@ def ode_prepare():
     lines, functions_info = get_ode_function_lines_names()
 
     # write out the function info to a python file
-    with open("./few/utils/odeoptions.py", "w") as fp:
+    with open(dir_path + "/../../few/utils/odeoptions.py", "w") as fp:
         fp.write("ode_options = " + functions_info.__repr__())
 
     # start preparing ode.cc
@@ -151,11 +99,10 @@ def ode_prepare():
     # adjust function names for functions that are not classes
     for line in lines:
         for func in functions_info:
-
-            if "void " + func + "(dou" in line:
+            if "void " + func + "(double* " in line:
                 line = line.replace(
-                    "void " + func + "(dou",
-                    "void " + func + "_base_func" + "(dou",
+                    "void " + func + "(double* ",
+                    "void " + func + "_base_func" + "(double* ",
                 )
         full += line
 
@@ -227,6 +174,7 @@ def ode_prepare():
     """
 
     for i, (func, info) in enumerate(functions_info.items()):
+
         lead = "if" if i == 0 else "else if"
 
         full += """
@@ -253,13 +201,15 @@ def ode_prepare():
     full += """
     }
     """
+    # destructor
     full += """
 
-    void ODECarrier::dealloc()
+    ODECarrier::~ODECarrier()
     {
     """
 
     for i, (func, info) in enumerate(functions_info.items()):
+
         lead = "if" if i == 0 else "else if"
 
         full += """
@@ -287,16 +237,15 @@ def ode_prepare():
     """
 
     # write out to ode.cc
-    with open(src + "ode.cc", "w") as fp:
+    with open(dir_path + "/../../src/ode.cc", "w") as fp:
         fp.write(full)
 
-    include = "include/"
     # get ode_base_example.hh
-    with open(include + "ode_base_example.hh", "r") as fp:
+    with open(dir_path + "/../../include/ode_base_example.hh", "r") as fp:
         hh_lines = fp.read()
 
-    if "ode_base.hh" in os.listdir(include):
-        with open(include + "ode_base.hh", "r") as fp:
+    if "ode_base.hh" in os.listdir(dir_path + "/../../include/"):
+        with open(dir_path + "/../../include/ode_base.hh", "r") as fp:
             hh_lines += fp.read()
 
     full_hh = """
@@ -311,8 +260,10 @@ def ode_prepare():
     """
 
     full_hh += hh_lines
+
     # putting together class info for functions that are not classes
     for i, (func, info) in enumerate(functions_info.items()):
+
         if info["type"] == "func":
             full_hh += """
 
@@ -341,7 +292,7 @@ def ode_prepare():
             std::string few_dir;
             void* func;
             ODECarrier(std::string func_name_, std::string few_dir_);
-            void dealloc();
+            ~ODECarrier();
             void get_derivatives(double* pdot, double* edot, double* Ydot,
                               double* Omega_phi, double* Omega_theta, double* Omega_r,
                               double epsilon, double a, double p, double e, double Y, double* additional_args);
@@ -355,6 +306,3 @@ def ode_prepare():
     # add to ode.hh
     with open("include/ode.hh", "w") as fp:
         fp.write(full_hh)
-
-
-ode_prepare()

@@ -127,6 +127,9 @@ class EMRIInspiral(TrajectoryBase):
         for key, item in ode_info[func].items():
             setattr(self, key, item)
 
+
+
+
         # make sure all files needed for the ode specifically are downloaded
         for fp in self.files:
             try:
@@ -135,7 +138,7 @@ class EMRIInspiral(TrajectoryBase):
                 raise ValueError(
                     f"File required for this ODE ({fp}) was not found in the proper folder ({few_dir + 'few/files/'}) or on zenodo."
                 )
-
+        breakpoint()
         self.inspiral_generator = pyInspiralGenerator(
             func,
             enforce_schwarz_sep,
@@ -143,6 +146,9 @@ class EMRIInspiral(TrajectoryBase):
             self.convert_Y,
             few_dir.encode(),
         )
+        
+
+
 
         self.func = func
 
@@ -156,6 +162,7 @@ class EMRIInspiral(TrajectoryBase):
         ]
 
         self.get_derivative = pyDerivative(self.func, few_dir.encode())
+
 
     def attributes_EMRIInspiral(self):
         """

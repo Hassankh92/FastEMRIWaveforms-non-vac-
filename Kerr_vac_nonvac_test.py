@@ -47,9 +47,13 @@ except (ModuleNotFoundError, ImportError) as e:
     gpu_available = False
 
 
-traj_few = EMRIInspiral(func="SchwarzEccFlux")
-print(traj_few)
-traj_Kerr = EMRIInspiral(func="KerrCircFlux")
+# traj_few = EMRIInspiral(func="SchwarzEccFlux")
+# print("old few traj ran",traj_few,"\n")
+
+# traj_Kerr = EMRIInspiral(func="KerrCircFlux")
+# print("Kerr traj ran",traj_Kerr,"\n")
+
+
 traj_migration = EMRIInspiral(func="MigTorqKerrCircFlux")
 traj_cloud = EMRIInspiral(func="CloudKerrCircFlux")
 

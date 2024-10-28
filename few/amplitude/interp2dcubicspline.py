@@ -26,7 +26,7 @@ import numpy as np
 from pyInterp2DAmplitude import pyAmplitudeGenerator, pyAmplitudeGenerator_Kerr 
 
 # Python imports
-from few.utils.baseclasses import SchwarzschildEccentric, AmplitudeBase, AmplitudeBase_Kerr, KerrCircular
+from few.utils.baseclasses import SchwarzschildEccentric, AmplitudeBase, AmplitudeBaseKerrCircular, KerrCircular
 from few.utils.utility import check_for_file_download
 from few.utils.citations import *
 

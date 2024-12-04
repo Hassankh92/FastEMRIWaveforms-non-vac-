@@ -47,11 +47,11 @@ except (ModuleNotFoundError, ImportError) as e:
     gpu_available = False
 
 
-# traj_few = EMRIInspiral(func="SchwarzEccFlux")
-# print("old few traj ran",traj_few,"\n")
+traj_few = EMRIInspiral(func="SchwarzEccFlux")
+print("old few traj ran",traj_few,"\n")
 
-# traj_Kerr = EMRIInspiral(func="KerrCircFlux")
-# print("Kerr traj ran",traj_Kerr,"\n")
+traj_Kerr = EMRIInspiral(func="KerrCircFlux")
+print("Kerr traj ran",traj_Kerr,"\n")
 
 
 traj_migration = EMRIInspiral(func="MigTorqKerrCircFlux")
@@ -88,3 +88,9 @@ t_Kerr  = Kerr_result[0]
 t_migration = migration_result[0]
 t_cloud = cloud_result[0]
 print("Kerr final time: ", t_Kerr[-1], "Migration final time: ", t_migration[-1], "Cloud final time: ", t_cloud[-1])
+
+
+p_Kerr = Kerr_result[1]
+p_migration = migration_result[1]
+p_cloud = cloud_result[1]
+print("Kerr final p: ", p_Kerr[-1], "Migration final p: ", p_migration[-1], "Cloud final p: ", p_cloud[-1])

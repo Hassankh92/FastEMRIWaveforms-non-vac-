@@ -43,20 +43,20 @@ cdef class pyAmplitudeGenerator:
 
 
 cdef extern from "Amplitude.hh":
-    cdef cppclass AmplitudeCarrierWrap_Kerr "AmplitudeCarrier_Kerr":
-        AmplitudeCarrierWrap_Kerr(int lmax_, int nmax_, string few_dir)
+    cdef cppclass KerrCircAmplitudeCarrierWrap "KerrCircAmplitudeCarrier":
+        KerrCircAmplitudeCarrierWrap(int lmax_, int nmax_, string few_dir)
         void dealloc()
 
-        void Interp2DAmplitude_Kerr(np.complex128_t *amplitude_out, double *a_arr,  double *p_arr, double *e_arr, int *l_arr, int *m_arr, int *n_arr, int num, int num_modes);
+        void Interp2DAmplitude_kerr_circ(np.complex128_t *amplitude_out, double *a_arr,  double *p_arr, double *e_arr, int *l_arr, int *m_arr, int *n_arr, int num, int num_modes);
 
 
-cdef class pyAmplitudeGenerator_Kerr:
+cdef class pyAmplitudeGenerator_kerr_circ:
 
-    cdef AmplitudeCarrierWrap_Kerr *g_Kerr
+    cdef KerrCircAmplitudeCarrierWrap *g_Kerr
 
     def __cinit__(self, lmax, nmax, few_dir):
         cdef string few_dir_in = str.encode(few_dir)
-        self.g_Kerr = new AmplitudeCarrierWrap_Kerr(lmax, nmax, few_dir_in)
+        self.g_Kerr = new KerrCircAmplitudeCarrierWrap(lmax, nmax, few_dir_in)
 
     def __dealloc__(self):
         self.g_Kerr.dealloc()
@@ -75,6 +75,6 @@ cdef class pyAmplitudeGenerator_Kerr:
         cdef size_t m_arr_in = m_arr
         cdef size_t n_arr_in = n_arr
 
-        self.g_Kerr.Interp2DAmplitude_Kerr(&amplitude_out[0], <double *>a_in, <double *>p_in,  <double *>e_in, <int *>l_arr_in, <int *>m_arr_in, <int *>n_arr_in, input_len, num_modes);
+        self.g_Kerr.Interp2DAmplitude_kerr_circ(&amplitude_out[0], <double *>a_in, <double *>p_in,  <double *>e_in, <int *>l_arr_in, <int *>m_arr_in, <int *>n_arr_in, input_len, num_modes);
 
         return amplitude_out.reshape(input_len, num_modes)

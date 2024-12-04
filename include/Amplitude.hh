@@ -53,20 +53,20 @@ public:
 
 // The 31 below means the lmax = 30
 
-struct waveform_amps_Kerr
+struct waveform_amps_kerr_circ
 {
     Interpolant ***re[31];
     Interpolant ***im[31];
 };
 
-class AmplitudeCarrier_Kerr
+class KerrCircAmplitudeCarrier
 {
 public:
-    struct waveform_amps_Kerr *amps;
+    struct waveform_amps_kerr_circ *amps;
     int lmax, nmax;
 
-    AmplitudeCarrier_Kerr(int lmax_, int nmax_, std::string few_dir);
-    void Interp2DAmplitude_Kerr(std::complex<double> *amplitude_out, double *a_arr, double *p_arr, double *e_arr, int *l_arr, int *m_arr, int *n_arr, int num, int num_modes);
+    KerrCircAmplitudeCarrier(int lmax_, int nmax_, std::string few_dir);
+    void Interp2DAmplitude_kerr_circ(std::complex<double> *amplitude_out, double *a_arr, double *p_arr, double *e_arr, int *l_arr, int *m_arr, int *n_arr, int num, int num_modes);
 
     void dealloc();
 };

@@ -1208,7 +1208,7 @@ class KerrCircular(ParallelModuleBase, ABC):
             )
 
 
-class AmplitudeBaseKerr(ABC):
+class AmplitudeBaseKerrCirc(ABC):
     """Base class used for amplitude modules.
 
     This class provides a common flexible interface to various amplitude
@@ -1225,7 +1225,7 @@ class AmplitudeBaseKerr(ABC):
         pass
 
     @classmethod
-    def get_amplitudes_kerr(self, *args, **kwargs):
+    def get_amplitudes_kerr_circ(self, *args, **kwargs):
         """Amplitude Generator
 
         @classmethod that requires a child class to have a get_amplitudes method.
@@ -1263,4 +1263,4 @@ class AmplitudeBaseKerr(ABC):
 
         """
 
-        return self.get_amplitudes_kerr(*args, specific_modes=specific_modes, **kwargs)
+        return self.get_amplitudes_kerr_circ(*args, specific_modes=specific_modes, **kwargs)

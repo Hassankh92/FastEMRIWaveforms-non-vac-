@@ -245,12 +245,15 @@ void KerrGeoCoordinateFrequencies(double* OmegaPhi_, double* OmegaTheta_, double
                               double a, double p, double e, double x)
 {
 
+printf("inside the kerr geo freq \t a, p, e, x = %f %f %f %f\n", a, p, e, x);
     double CapitalGamma, CapitalUpsilonPhi, CapitalUpsilonTheta, CapitalUpsilonR;
     KerrGeoMinoFrequencies(&CapitalGamma, &CapitalUpsilonPhi, &CapitalUpsilonTheta, &CapitalUpsilonR,
                                   a, p, e, x);
     *OmegaPhi_ = CapitalUpsilonPhi / CapitalGamma;
     *OmegaTheta_ = CapitalUpsilonTheta / CapitalGamma;
     *OmegaR_ = CapitalUpsilonR / CapitalGamma;
+
+    printf("OmegaPhi, OmegaTheta, OmegaR = %f %f %f\n", *OmegaPhi_, *OmegaTheta_, *OmegaR_);
 
 }
 

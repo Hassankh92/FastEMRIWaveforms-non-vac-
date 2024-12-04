@@ -263,6 +263,8 @@ class EMRIInspiral(TrajectoryBase):
             args_in = np.array([0.0])
 
         # this will return in coordinate time
+        # breakpoint()
+        print("test vars: ", M, mu, a, p0, e0, x0, Phi_phi0, Phi_theta0, Phi_r0, args_in)
         t, p, e, x, Phi_phi, Phi_theta, Phi_r = self.inspiral_generator(
             M, mu, a, p0, e0, x0, Phi_phi0, Phi_theta0, Phi_r0, args_in, **temp_kwargs
         )

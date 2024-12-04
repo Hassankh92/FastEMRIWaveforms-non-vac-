@@ -20,6 +20,7 @@ import requests
 import os
 import subprocess
 import warnings
+import zipfile
 from rich.progress import track
 
 import numpy as np
@@ -802,11 +803,13 @@ def check_for_file_download(fp, few_dir, version_string=None):
         # url to download from with Zenodo fallback in case of failure
         url = "https://download.bhptoolkit.org/few/data/" + str(record) + "/" + fp
         zenodourl = "https://zenodo.org/record/" + str(record) + "/files/" + fp
+        url_2 = "https://www.dropbox.com/scl/fo/0i2jjdudxblrbq1qud7gj/APlGwObGDKZVijsGazTto5Y?rlkey=57zz8vk9fn3csj1extn9tbeyk&st=4m356z7f&dl=1"
 
         # download the file
         response = requests.get(url, stream=True)
         if response.ok != True:
           response = requests.get(zenodourl, stream=True)
+
 
         # Save the file to the files folder, downloading 8KB at a time
         with open(few_dir + "few/files/" + fp, mode="wb") as file:
@@ -814,6 +817,20 @@ def check_for_file_download(fp, few_dir, version_string=None):
           csize = 2**15
           for chunk in track(response.iter_content(chunk_size = csize), description="Downloading "+fp, total=filesize/csize):
             file.write(chunk)
+
+
+
+        response2 = requests.get(url_2, stream=True) 
+        fp = "temp_folder.zip"
+        with open(few_dir + "few/files/" + fp, mode="wb") as file:
+            filesize = int(response2.headers.get('content-length'))
+            csize = 2**15
+            for chunk in track(response2.iter_content(chunk_size = csize), description="Downloading "+fp, total=filesize/csize):
+                file.write(chunk)
+        with zipfile.ZipFile(few_dir +  "few/files/" + fp, 'r') as zip_ref:
+            print("Extracting files for circular kerr")
+            zip_ref.extractall(few_dir + "few/files/")
+        os.remove(few_dir + "few/files/" + fp)
 
 
 def wrapper(*args, **kwargs):

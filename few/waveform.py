@@ -37,7 +37,7 @@ from few.utils.baseclasses import (
     KerrCircular,
 )
 from few.trajectory.inspiral import EMRIInspiral
-from few.amplitude.interp2dcubicspline import Interp2DAmplitude, Interp2DAmplitudeKerr
+from few.amplitude.interp2dcubicspline import Interp2DAmplitude, Interp2DAmplitudeKerrCircular
 from few.utils.utility import get_mismatch, xI_to_Y, p_to_y, check_for_file_download
 from few.amplitude.romannet import RomanAmplitude
 from few.utils.modeselector import ModeSelector
@@ -48,7 +48,7 @@ from few.utils.constants import *
 from few.utils.citations import *
 from few.summation.interpolatedmodesum import (
     InterpolatedModeSum,
-    InterpolatedModeSumKerr,
+    InterpolatedModeSumKerrCirc,
 )
 from few.summation.fdinterp import FDInterpolatedModeSum
 
@@ -974,9 +974,9 @@ class SlowSchwarzschildEccentricFlux(SchwarzschildEccentricWaveformBase):
 
 
 # ******************* Kerr base class here
-class KerrRelativisticWaveformBase(KerrCircular, ParallelModuleBase, ABC):
+class KerrCircRelativisticWaveformBase(KerrCircular, ParallelModuleBase, ABC):
 
-    def attributes_KerrRelativisticWaveformBase(self):
+    def attributes_KerrCircRelativisticWaveformBase(self):
         """
         attributes:
             inspiral_generator (obj): instantiated trajectory module.
@@ -1332,7 +1332,7 @@ class KerrRelativisticWaveformBase(KerrCircular, ParallelModuleBase, ABC):
         return waveform / dist_dimensionless
 
 
-class RelativisticKerrCircularFlux(KerrRelativisticWaveformBase):
+class KerrCircularFlux(KerrCircRelativisticWaveformBase):
 
     @property
     def gpu_capability(self):
@@ -1342,7 +1342,7 @@ class RelativisticKerrCircularFlux(KerrRelativisticWaveformBase):
     def allow_batching(self):
         return False
 
-    def attributes_RelativisticKerrCircularFlux(self):
+    def attributes_KerrCircularFlux(self):
         """
         attributes:
             gpu_capability (bool): If True, this wavefrom can leverage gpu
@@ -1367,11 +1367,11 @@ class RelativisticKerrCircularFlux(KerrRelativisticWaveformBase):
         # inspiral_kwargs["DENSE_STEPPING"] = 0
         inspiral_kwargs["func"] = "Relativistic_Kerr_Circ_Flux"
 
-        KerrRelativisticWaveformBase.__init__(
+        KerrCircRelativisticWaveformBase.__init__(
             self,
             EMRIInspiral,
-            Interp2DAmplitudeKerr,
-            InterpolatedModeSumKerr,
+            Interp2DAmplitudeKerrCircular,
+            InterpolatedModeSumKerrCirc,
             inspiral_kwargs=inspiral_kwargs,
             amplitude_kwargs=amplitude_kwargs,
             sum_kwargs=sum_kwargs,
@@ -1380,6 +1380,120 @@ class RelativisticKerrCircularFlux(KerrRelativisticWaveformBase):
             *args,
             **kwargs,
         )
+
+
+class MigrationTorqueKerrCircularFlux(KerrCircRelativisticWaveformBase):
+
+    @property
+    def gpu_capability(self):
+        return True
+
+    @property
+    def allow_batching(self):
+        return False
+
+    def attributes_MigrationTorqueKerrCircularFlux(self):
+        """
+        attributes:
+            gpu_capability (bool): If True, this wavefrom can leverage gpu
+                resources. For this class it is False.
+            allow_batching (bool): If True, this waveform can use the batch_size
+                kwarg. For this class it is True.
+        """
+        pass
+
+    def __init__(
+        self,
+        inspiral_kwargs={},
+        amplitude_kwargs={},
+        sum_kwargs={},
+        Ylm_kwargs={},
+        use_gpu=False,
+        *args,
+        **kwargs,
+    ):
+
+        # declare specific properties
+        # inspiral_kwargs["DENSE_STEPPING"] = 0
+        inspiral_kwargs["func"] = "MigTorqKerrCircFlux"
+
+        KerrCircRelativisticWaveformBase.__init__(
+            self,
+            EMRIInspiral,
+            Interp2DAmplitudeKerrCircular,
+            InterpolatedModeSumKerrCirc,
+            inspiral_kwargs=inspiral_kwargs,
+            amplitude_kwargs=amplitude_kwargs,
+            sum_kwargs=sum_kwargs,
+            Ylm_kwargs=Ylm_kwargs,
+            use_gpu=use_gpu,
+            *args,
+            **kwargs,
+        )
+
+
+
+
+
+
+class ScalarCloudKerrCircularFlux(KerrCircRelativisticWaveformBase):
+
+    @property
+    def gpu_capability(self):
+        return True
+
+    @property
+    def allow_batching(self):
+        return False
+
+    def attributes_ScalarCloudKerrCircularFlux(self):
+        """
+        attributes:
+            gpu_capability (bool): If True, this wavefrom can leverage gpu
+                resources. For this class it is False.
+            allow_batching (bool): If True, this waveform can use the batch_size
+                kwarg. For this class it is True.
+        """
+        pass
+
+    def __init__(
+        self,
+        inspiral_kwargs={},
+        amplitude_kwargs={},
+        sum_kwargs={},
+        Ylm_kwargs={},
+        use_gpu=False,
+        *args,
+        **kwargs,
+    ):
+
+        # declare specific properties
+        # inspiral_kwargs["DENSE_STEPPING"] = 0
+        inspiral_kwargs["func"] = "CloudKerrCircFlux"
+
+        KerrCircRelativisticWaveformBase.__init__(
+            self,
+            EMRIInspiral,
+            Interp2DAmplitudeKerrCircular,
+            InterpolatedModeSumKerrCirc,
+            inspiral_kwargs=inspiral_kwargs,
+            amplitude_kwargs=amplitude_kwargs,
+            sum_kwargs=sum_kwargs,
+            Ylm_kwargs=Ylm_kwargs,
+            use_gpu=use_gpu,
+            *args,
+            **kwargs,
+        )
+
+
+
+
+
+
+
+
+
+
 
 
 class AAKWaveformBase(Pn5AAK, ParallelModuleBase, ABC):

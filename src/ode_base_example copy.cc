@@ -172,6 +172,112 @@ SchwarzEccFlux::~SchwarzEccFlux()
 
 
 
+// void load_and_interpolate_flux_data_kerr_circ(struct interp_params *interps, const std::string &few_dir)
+// {
+
+//     // Load and interpolate the flux data
+//     std::string fp = "/few/files/Kerr_flux_minus_PN1_kerr_circ.dat";
+//     fp = few_dir + fp;
+//     ifstream Flux_file(fp);
+
+//     if (Flux_file.fail())
+//     {
+//         throw std::runtime_error("The file Kerr_flux_minus_PN1_kerr_circ did not open sucessfully. Make sure it is located in the proper directory (Path/to/Installation/few/files/).");
+//     }
+
+//     // Load the flux data into arrays
+//     string Flux_string;
+//     vector<double> ys, as, EdotsKerr;
+//     double y, a, EdotKerr;
+//     while (getline(Flux_file, Flux_string))
+//     {
+
+//         stringstream Flux_ss(Flux_string);
+
+//         Flux_ss >> y >> a >> EdotKerr;
+
+//         ys.push_back(y);
+//         as.push_back(a);
+//         EdotsKerr.push_back(EdotKerr);
+//     }
+//     // printf("in the kerr load %1.6e, %1.6e\n", a, y);
+
+//     // Remove duplicate elements (only works if ys are perfectly repeating with no round off errors)
+//     sort(ys.begin(), ys.end());
+//     ys.erase(unique(ys.begin(), ys.end()), ys.end());
+
+//     sort(as.begin(), as.end());
+//     as.erase(unique(as.begin(), as.end()), as.end());
+
+//     // notice that if you resort ys and a you have to change also Edots
+
+//     Interpolant *EdotKerr_interp = new Interpolant(ys, as, EdotsKerr);
+
+//     interps->EdotKerrCirc = EdotKerr_interp;
+// }
+
+// // KerrCircFlux_Has
+
+// KerrCircFlux::KerrCircFlux(std::string few_dir)
+// {
+//     interps = new interp_params;
+//     load_and_interpolate_flux_data_kerr_circ(interps, few_dir);
+// }
+
+// double KerrCircFlux::EdotPN(double r, double a)
+// {
+//     double y = pow(1. / (sqrt(r * r * r) + a), 2. / 3.);
+//     double res = 6.4 * pow(y, 5);
+//     return res;
+// }
+
+// #define KerrCircFlux_num_add_args 0
+// #define KerrCircFlux_equatorial
+// #define KerrCircFlux_circular
+// #define KerrCircFlux_file1 Kerr_flux_minus_PN1_kerr_circ.dat
+// __deriv__
+// void KerrCircFlux::deriv_func(double *pdot, double *edot, double *xdot,
+//                                                        double *Omega_phi, double *Omega_theta, double *Omega_r,
+//                                                        double epsilon, double a, double p, double e, double x, double *additional_args)
+// {
+//     double p_sep = get_separatrix(a, e, x);
+//     if (p_sep > p)
+//     {
+//         *pdot = 0.0;
+//         *edot = 0.0;
+//         *xdot = 0.0;
+//         return;
+//     }
+
+//     double u = log((p - p_sep + 3.9));
+
+//     KerrGeoCoordinateFrequencies(Omega_phi, Omega_theta, Omega_r, a, p, e, x);
+//     *Omega_theta = *Omega_phi;
+//     *Omega_r = *Omega_phi;
+//     // evaluate ODEs, starting with PN contribution, then interpolating over remaining flux contribution
+
+//     double yPNKerr = pow(1. / (sqrt(p * p * p) + a), 2. / 3.);
+
+//     double EdotKerr = epsilon * (interps->EdotKerrCirc->eval(u, a) * pow(yPNKerr, 6.) + EdotPN(p, a));
+//     double LdotKerr = EdotKerr / *Omega_phi;
+
+//     double dL_dp = (-3 * Power(a, 3) + Power(a, 2) * (8 - 3 * p) * Sqrt(p) + (-6 + p) * Power(p, 2.5) + 3 * a * p * (-2 + 3 * p)) / (2. * Power(2 * a + (-3 + p) * Sqrt(p), 1.5) * Power(p, 1.75));
+//     *pdot = -LdotKerr / dL_dp;
+
+//     *edot = 0.0;
+//     *xdot = 0.0;
+// }
+
+// // destructor
+// KerrCircFlux::~KerrCircFlux()
+// {
+
+//     delete interps->EdotKerrCirc;
+//     delete interps;
+// }
+
+
+
 void load_and_interpolate_flux_data_kerr_circ(struct interp_params *interps, const std::string &few_dir)
 {
 
@@ -184,21 +290,23 @@ void load_and_interpolate_flux_data_kerr_circ(struct interp_params *interps, con
     {
         throw std::runtime_error("The file Kerr_flux_minus_PN1_kerr_circ did not open sucessfully. Make sure it is located in the proper directory (Path/to/Installation/few/files/).");
     }
+    // printf("seccessfully opened the file\n");
 
     // Load the flux data into arrays
     string Flux_string;
-    vector<double> ys, as, EdotsKerr;
-    double y, a, EdotKerr;
+    vector<double> ys, as, Edots_Kerr;
+    double y, a, Edot_Kerr;
     while (getline(Flux_file, Flux_string))
     {
 
         stringstream Flux_ss(Flux_string);
 
-        Flux_ss >> y >> a >> EdotKerr;
+        Flux_ss >> y >> a >> Edot_Kerr;
 
         ys.push_back(y);
         as.push_back(a);
-        EdotsKerr.push_back(EdotKerr);
+        Edots_Kerr.push_back(Edot_Kerr);
+        // printf("Edots_Kerr %1.6e\n", Edot_Kerr);
     }
     // printf("in the kerr load %1.6e, %1.6e\n", a, y);
 
@@ -211,9 +319,9 @@ void load_and_interpolate_flux_data_kerr_circ(struct interp_params *interps, con
 
     // notice that if you resort ys and a you have to change also Edots
 
-    Interpolant *EdotKerr_interp = new Interpolant(ys, as, EdotsKerr);
+    Interpolant *Edot_Kerr_interp = new Interpolant(ys, as, Edots_Kerr);
 
-    interps->EdotKerrCirc = EdotKerr_interp;
+    interps->Edot_Kerr = Edot_Kerr_interp;
 }
 
 // KerrCircFlux_Has
@@ -258,11 +366,11 @@ void KerrCircFlux::deriv_func(double *pdot, double *edot, double *xdot,
 
     double yPNKerr = pow(1. / (sqrt(p * p * p) + a), 2. / 3.);
 
-    double EdotKerr = epsilon * (interps->EdotKerrCirc->eval(u, a) * pow(yPNKerr, 6.) + EdotPN(p, a));
-    double LdotKerr = EdotKerr / *Omega_phi;
+    double Edot_Kerr = epsilon * (interps->Edot_Kerr->eval(u, a) * pow(yPNKerr, 6.) + EdotPN(p, a));
+    double Ldot_Kerr = Edot_Kerr / *Omega_phi;
 
     double dL_dp = (-3 * Power(a, 3) + Power(a, 2) * (8 - 3 * p) * Sqrt(p) + (-6 + p) * Power(p, 2.5) + 3 * a * p * (-2 + 3 * p)) / (2. * Power(2 * a + (-3 + p) * Sqrt(p), 1.5) * Power(p, 1.75));
-    *pdot = -LdotKerr / dL_dp;
+    *pdot = -Ldot_Kerr / dL_dp;
 
     *edot = 0.0;
     *xdot = 0.0;
@@ -272,10 +380,9 @@ void KerrCircFlux::deriv_func(double *pdot, double *edot, double *xdot,
 KerrCircFlux::~KerrCircFlux()
 {
 
-    delete interps->EdotKerrCirc;
+    delete interps->Edot_Kerr;
     delete interps;
 }
-
 
 
 

@@ -450,7 +450,7 @@ class InterpolatedModeSum(SummationBase, SchwarzschildEccentric, ParallelModuleB
         )
 
 
-class InterpolatedModeSumKerr(SummationBase, KerrCircular, ParallelModuleBase):
+class InterpolatedModeSumKerrCirc(SummationBase, KerrCircular, ParallelModuleBase):
     """Create waveform by interpolating sparse trajectory.
 
     It interpolates all of the modes of interest and phases at sparse

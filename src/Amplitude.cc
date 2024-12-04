@@ -213,7 +213,7 @@ const int Nu = 99;
 const int Na = 100;
 const int Ne2 = 1;
 
-void create_amplitude_interpolant_Kerr(hid_t file_id, int l, int m, int n, int Na, int Nu, int Ne2, vector<double> &as, vector<double> &us, vector<double> &es, Interpolant **re, Interpolant **im)
+void create_amplitude_interpolant_kerr_circ(hid_t file_id, int l, int m, int n, int Na, int Nu, int Ne2, vector<double> &as, vector<double> &us, vector<double> &es, Interpolant **re, Interpolant **im)
 {
 
     // amplitude data has a real and imaginary part
@@ -249,7 +249,7 @@ void create_amplitude_interpolant_Kerr(hid_t file_id, int l, int m, int n, int N
 
 // *****KERR DATA
 // collect data and initialize amplitude interpolants
-void load_and_interpolate_amplitude_data_Kerr(int lmax, int nmax, struct waveform_amps_Kerr *amps, const std::string &few_dir)
+void load_and_interpolate_amplitude_data_kerr_circ(int lmax, int nmax, struct waveform_amps_kerr_circ *amps, const std::string &few_dir)
 {
 
     hid_t file_id;
@@ -309,7 +309,7 @@ void load_and_interpolate_amplitude_data_Kerr(int lmax, int nmax, struct wavefor
             for (int n = -nmax; n <= nmax; n++) // the bug was here instead of n++ I had m++ :(
             {
 
-                create_amplitude_interpolant_Kerr(file_id, l, m, n, Na, Nu, Ne2, as, us, es, &amps->re[l][m][n + nmax], &amps->im[l][m][n + nmax]);
+                create_amplitude_interpolant_kerr_circ(file_id, l, m, n, Na, Nu, Ne2, as, us, es, &amps->re[l][m][n + nmax], &amps->im[l][m][n + nmax]);
             }
         }
     }
@@ -318,19 +318,19 @@ void load_and_interpolate_amplitude_data_Kerr(int lmax, int nmax, struct wavefor
 }
 
 // Amplitude Carrier is class for interaction with python carrying gsl interpolant information  for KERR********
-AmplitudeCarrier_Kerr::AmplitudeCarrier_Kerr(int lmax_, int nmax_, std::string few_dir)
+KerrCircAmplitudeCarrier::KerrCircAmplitudeCarrier(int lmax_, int nmax_, std::string few_dir)
 {
     lmax = lmax_;
     nmax = nmax_;
 
-    amps = new struct waveform_amps_Kerr;
+    amps = new struct waveform_amps_kerr_circ;
 
-    load_and_interpolate_amplitude_data_Kerr(lmax, nmax, amps, few_dir);
+    load_and_interpolate_amplitude_data_kerr_circ(lmax, nmax, amps, few_dir);
     // printf("after load func\n");
 }
 
 // need to have dealloc method for cython interface  for KERR********
-void AmplitudeCarrier_Kerr::dealloc()
+void KerrCircAmplitudeCarrier::dealloc()
 {
 
     // clear memory
@@ -355,7 +355,7 @@ void AmplitudeCarrier_Kerr::dealloc()
 }
 
 // main function for computing amplitudes for KERR********
-void AmplitudeCarrier_Kerr::Interp2DAmplitude_Kerr(std::complex<double> *amplitude_out, double *a_arr, double *p_arr, double *e_arr, int *l_arr, int *m_arr, int *n_arr, int num, int num_modes)
+void KerrCircAmplitudeCarrier::Interp2DAmplitude_kerr_circ(std::complex<double> *amplitude_out, double *a_arr, double *p_arr, double *e_arr, int *l_arr, int *m_arr, int *n_arr, int num, int num_modes)
 {
 
     // printf("in the interp3d func\n");

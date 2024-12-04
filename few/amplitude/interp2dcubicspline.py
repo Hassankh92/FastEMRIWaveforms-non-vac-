@@ -23,13 +23,13 @@ import h5py
 import numpy as np
 
 # Cython/C++ imports
-from pyInterp2DAmplitude import pyAmplitudeGenerator, pyAmplitudeGenerator_Kerr
+from pyInterp2DAmplitude import pyAmplitudeGenerator, pyAmplitudeGenerator_kerr_circ
 
 # Python imports
 from few.utils.baseclasses import (
     SchwarzschildEccentric,
     AmplitudeBase,
-    AmplitudeBaseKerr,
+    AmplitudeBaseKerrCirc,
     KerrCircular,
 )
 from few.utils.utility import check_for_file_download
@@ -179,7 +179,7 @@ class Interp2DAmplitude(AmplitudeBase, SchwarzschildEccentric):
             return temp
 
 
-class Interp2DAmplitudeKerr(AmplitudeBaseKerr, KerrCircular):
+class Interp2DAmplitudeKerrCircular(AmplitudeBaseKerrCirc, KerrCircular):
     """Calculate Teukolsky amplitudes by 2D Cubic Spline interpolation.
 
     Please see the documentations for
@@ -200,7 +200,7 @@ class Interp2DAmplitudeKerr(AmplitudeBaseKerr, KerrCircular):
     def __init__(self, **kwargs):
 
         KerrCircular.__init__(self, **kwargs)
-        AmplitudeBaseKerr.__init__(self, **kwargs)
+        AmplitudeBaseKerrCirc.__init__(self, **kwargs)
 
         # check if you have the necessary file
         # it will download from Zenodo if the user does not have it.
@@ -209,7 +209,7 @@ class Interp2DAmplitudeKerr(AmplitudeBaseKerr, KerrCircular):
         fp = "Clm00_e0.0_lmax_30.h5"
         check_for_file_download(fp, few_dir)
 
-        self.amplitude_generator = pyAmplitudeGenerator_Kerr(
+        self.amplitude_generator = pyAmplitudeGenerator_kerr_circ(
             self.lmax, self.nmax, few_dir
         )
 

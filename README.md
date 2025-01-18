@@ -1,22 +1,24 @@
 # Kerr Circular Equatorial orbits: Vaccum and non vacuum 
-Please refer to the paper:  
+Please refer and cite:  
 https://arxiv.org/abs/2410.17310
 
 ### Installing
 Create a Conda env:
 
+```
 conda create -n few_Kerr_NonVac -c conda-forge gcc_linux-64 gxx_linux-64 wget gsl lapack=3.6.1 hdf5 numpy Cython scipy tqdm jupyter ipython h5py requests matplotlib python
+```
 
+
+Clone the repository:
 ```
 git clone git@github.com:Hassankh92/FastEMRIWaveforms_KerrCircNonvac.git
 cd FastEMRIWaveforms_KerrCircNonvac
-
 ```
 
 
 ```
 python setup.py install
-
 ```
 
 
@@ -28,7 +30,7 @@ python setup.py install
 
 
 
-
+### Feel free to email me if you have any questions!
 
 
 # few: Fast EMRI Waveforms
@@ -40,85 +42,6 @@ This package is a part of the [Black Hole Perturbation Toolkit](https://bhptoolk
 If you use all or any parts of this code, please cite [arxiv.org/2104.04582](https://arxiv.org/abs/2104.04582) and [arxiv.org/2008.06071](https://arxiv.org/abs/2008.06071). See the [documentation](https://bhptoolkit.org/FastEMRIWaveforms/) to properly cite specific modules.
 
 
-1) Create a virtual environment.
-
-```
-conda create -n few_env -c conda-forge gcc_linux-64 gxx_linux-64 wget gsl lapack=3.6.1 hdf5 numpy Cython scipy tqdm jupyter ipython h5py requests matplotlib python=3.7
-conda activate few_env
-```
-
-    If on MACOSX, substitute `gcc_linux-64` and `gxx_linus-64` with `clang_osx-64` and `clangxx_osx-64`.
-
-    If you want a faster install, you can install the python packages (numpy, Cython, scipy, tqdm, jupyter, ipython, h5py, requests, matplotlib) with pip.
-
-2) Clone the repository.
-
-```
-git clone https://github.com/BlackHolePerturbationToolkit/FastEMRIWaveforms.git
-cd FastEMRIWaveforms
-```
-
-3) If using GPUs, use pip to [install cupy](https://docs-cupy.chainer.org/en/stable/install.html). If you have cuda version 9.2, for example:
-
-```
-pip install cupy-cuda92
-```
-
-4) Run install.
-
-```
-python setup.py install
-```
-
-
-When installing lapack and gsl, the setup file will default to assuming lib and include for both are in installed within the conda environment. To provide other lib and include directories you can provide command line options when installing. You can also remove usage of OpenMP.
-
-```
-python setup.py --help
-usage: setup.py [-h] [--lapack_lib LAPACK_LIB]
-                [--lapack_include LAPACK_INCLUDE] [--lapack LAPACK]
-                [--gsl_lib GSL_LIB] [--gsl_include GSL_INCLUDE] [--gsl GSL]
-                [--ccbin CCBIN]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --lapack_lib LAPACK_LIB
-                        Directory of the lapack lib. If you add lapack lib,
-                        must also add lapack include.
-  --lapack_include LAPACK_INCLUDE
-                        Directory of the lapack include. If you add lapack
-                        includ, must also add lapack lib.
-  --lapack LAPACK       Directory of both lapack lib and include. '/include'
-                        and '/lib' will be added to the end of this string.
-  --gsl_lib GSL_LIB     Directory of the gsl lib. If you add gsl lib, must
-                        also add gsl include.
-  --gsl_include GSL_INCLUDE
-                        Directory of the gsl include. If you add gsl include,
-                        must also add gsl lib.
-  --gsl GSL             Directory of both gsl lib and include. '/include' and
-                        '/lib' will be added to the end of this string.
-  --ccbin CCBIN         path/to/compiler to link with nvcc when installing
-                        with CUDA.
-```
-
-When installing the package with `python setup.py install`, the setup file uses the C compiler present in your `PATH`. However, it might happen that the setup file incorrectly uses another compiler present on your path. To solve this issue you can directly specify the C compiler using the flag `--ccbin` as in the following example:
-
-```
-python setup.py install --ccbin /path/to/anaconda3/envs/few_env/bin/x86_64-conda-linux-gnu-gcc
-```
-
-or if on MACOSX:
-
-```
-python setup.py install --ccbin /path/to/anaconda3/envs/few_env/bin/x86_64-apple-darwin13.4.0-clang
-```
-
-## Running the Tests
-
-In the main directory of the package run in the terminal (if you run [install.sh](install.sh) with defaults, the tests will be performed):
-```
-python -m unittest discover
-```
 
 
 ## Contributing

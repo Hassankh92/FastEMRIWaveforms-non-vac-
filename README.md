@@ -22,7 +22,14 @@ python setup.py install
 ```
 
 
+Run the tests: 
 
+For trajectories
+```
+Kerr_vac_nonvac_test.py
+```
+
+For Waveforms test, refer to the Test_Notebook.ipynb
 
 
 

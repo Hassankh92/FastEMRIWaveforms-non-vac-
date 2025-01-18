@@ -2,6 +2,10 @@
 Please refer to the paper:  
 https://arxiv.org/abs/2410.17310
 
+Installation --> 
+Create a Conda env:
+
+conda create -n few_Kerr_NonVac -c conda-forge gcc_linux-64 gxx_linux-64 wget gsl lapack=3.6.1 hdf5 numpy Cython scipy tqdm jupyter ipython h5py requests matplotlib python
 
 # few: Fast EMRI Waveforms
 

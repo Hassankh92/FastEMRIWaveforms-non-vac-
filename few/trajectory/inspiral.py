@@ -138,7 +138,7 @@ class EMRIInspiral(TrajectoryBase):
                 raise ValueError(
                     f"File required for this ODE ({fp}) was not found in the proper folder ({few_dir + 'few/files/'}) or on zenodo."
                 )
-        breakpoint()
+        # breakpoint()
         self.inspiral_generator = pyInspiralGenerator(
             func,
             enforce_schwarz_sep,

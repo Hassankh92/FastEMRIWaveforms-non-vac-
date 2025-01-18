@@ -20,6 +20,8 @@ import requests
 import os
 import subprocess
 import warnings
+import zipfile
+
 
 import numpy as np
 from scipy.interpolate import CubicSpline
@@ -857,25 +859,26 @@ def check_for_file_download(fp, few_dir, version_string=None):
         # run wget from terminal to get the folder
         # download to proper location
         # subprocess.run(["wget", "--no-check-certificate", url])
-        result = subprocess.run(["wget", "--no-check-certificate", url])
+        result = subprocess.run(["wget", "--no-check-certificate","-P", few_dir + "few/files/" , url])
         # move it into the files folder
         # os.rename(fp, few_dir + "few/files/" + fp)
+        # breakpoint()
         
-        if result.returncode != 0:
-            warnings.warn(
-            "\n\n The file {} could not be downloaded from the first URL. Attempting the second URL.\n\n".format(fp))
-            temp_zip_path = os.path.join(few_dir, "temp_folder.zip")
-            result2 = subprocess.run(["wget", "--no-check-certificate", "-O" ,temp_zip_path , url_2])
-                 # If the second download also fails, raise an error
-            if result2.returncode != 0:
-                raise RuntimeError("The file {} could not be downloaded from either URL.".format(fp))
-             # Unzip the downloaded file into the target directory
-            with zipfile.ZipFile(few_dir + "temp_folder.zip", 'r') as zip_ref:
-                zip_ref.extractall(few_dir + "few/files/")
-            # Remove the temporary zip file
-            os.remove(few_dir + "temp_folder.zip")
+        # if result.returncode != 0:
+        warnings.warn(
+        "\n\n The file {} could not be downloaded from the first URL. Attempting the second URL.\n\n".format(fp))
+        temp_zip_path = os.path.join(few_dir, "few/files/temp_folder.zip")
+        result2 = subprocess.run(["wget", "--no-check-certificate", "-O" ,temp_zip_path , url_2])
+                # If the second download also fails, raise an error
+        if result2.returncode != 0:
+            raise RuntimeError("The file {} could not be downloaded from either URL.".format(fp))
+            # Unzip the downloaded file into the target directory
+        with zipfile.ZipFile(few_dir + "few/files/temp_folder.zip", 'r') as zip_ref:
+            zip_ref.extractall(few_dir + "few/files/")
+        # Remove the temporary zip file
+        os.remove(few_dir + "few/files/temp_folder.zip")
 
-        os.rename(fp, few_dir + "few/files/" + fp)
+        # os.rename(fp, few_dir + "few/files/" + fp)
 
 
 

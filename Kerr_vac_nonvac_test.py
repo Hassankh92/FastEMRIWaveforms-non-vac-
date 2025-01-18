@@ -48,24 +48,26 @@ except (ModuleNotFoundError, ImportError) as e:
 
 
 traj_few = EMRIInspiral(func="SchwarzEccFlux")
-print("old few traj ran",traj_few,"\n")
+print("old few traj loaded",traj_few,"\n")
 
 traj_Kerr = EMRIInspiral(func="KerrCircFlux")
-print("Kerr traj ran",traj_Kerr,"\n")
+print("Kerr traj loaded",traj_Kerr,"\n")
 
 
 traj_migration = EMRIInspiral(func="MigTorqKerrCircFlux")
-traj_cloud = EMRIInspiral(func="CloudKerrCircFlux")
+print("Migration traj loaded",traj_migration,"\n")
 
+traj_cloud = EMRIInspiral(func="CloudKerrCircFlux")
+print("Cloud traj loaded",traj_cloud,"\n")
 
 T = 4.0 # years
 dt = 10.0
 # set initial parameters
 M = 1e6
 mu = 5e1
-p0 = 12.0
+p0 = 10.0
 e0 = 0.0
-a0 = 0.5
+a0 = 0.8
 x0 = 1.0
 Y0 = 1.0
 

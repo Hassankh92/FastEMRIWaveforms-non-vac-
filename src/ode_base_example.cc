@@ -68,7 +68,7 @@ void load_and_interpolate_flux_data(struct interp_params *interps, const std::st
     {
         throw std::runtime_error("The file FluxNewMinusPNScaled_fixed_y_order.dat did not open sucessfully. Make sure it is located in the proper directory (Path/to/Installation/few/files/).");
     }
-    printf("seccessfully opened the file\n");
+    // printf("seccessfully opened the file\n");
 
     // Load the flux data into arrays
     string Flux_string;

@@ -2,10 +2,34 @@
 Please refer to the paper:  
 https://arxiv.org/abs/2410.17310
 
-Installation --> 
+### Installing
 Create a Conda env:
 
 conda create -n few_Kerr_NonVac -c conda-forge gcc_linux-64 gxx_linux-64 wget gsl lapack=3.6.1 hdf5 numpy Cython scipy tqdm jupyter ipython h5py requests matplotlib python
+
+```
+git clone git@github.com:Hassankh92/FastEMRIWaveforms_KerrCircNonvac.git
+cd FastEMRIWaveforms_KerrCircNonvac
+
+```
+
+
+```
+python setup.py install
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
 
 # few: Fast EMRI Waveforms
 
@@ -15,76 +39,6 @@ This package is a part of the [Black Hole Perturbation Toolkit](https://bhptoolk
 
 If you use all or any parts of this code, please cite [arxiv.org/2104.04582](https://arxiv.org/abs/2104.04582) and [arxiv.org/2008.06071](https://arxiv.org/abs/2008.06071). See the [documentation](https://bhptoolkit.org/FastEMRIWaveforms/) to properly cite specific modules.
 
-## Getting Started
-
-Install with pip (CPU only for now):
-```
-pip install fastemriwaveforms
-```
-
-In a python file or notebook:
-```
-import few
-```
-See [examples notebook](https://github.com/BlackHolePerturbationToolkit/FastEMRIWaveforms/blob/master/examples/FastEMRIWaveforms_tutorial.ipynb).
-
-
-### Prerequisites
-
-To install this software for CPU usage, you need [gsl >2.0](https://www.gnu.org/software/gsl/) , [lapack (3.6.1)](https://www.netlib.org/lapack/lug/node14.html), Python >3.4, wget, and NumPy. If you install lapack with conda, the new version (3.9) seems to not install the correct header files. Therefore, the lapack version must be 3.6.1. To run the examples, you will also need jupyter and matplotlib. We generally recommend installing everything, including gcc and g++ compilers, in the conda environment as is shown in the examples here. This generally helps avoid compilation and linking issues. If you use your own chosen compiler, you will need to make sure all necessary information is passed to the setup command (see below). You also may need to add information to the `setup.py` file.
-
-To install this software for use with NVIDIA GPUs (compute capability >2.0), you need the [CUDA toolkit](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html) and [CuPy](https://cupy.chainer.org/). The CUDA toolkit must have cuda version >8.0. Be sure to properly install CuPy within the correct CUDA toolkit version. Make sure the nvcc binary is on `$PATH` or set it as the `CUDA_HOME` environment variable.
-
-There are a set of files required for total use of this package. They will download automatically the first time they are needed. Files are generally under 10MB. However, there is a 100MB file needed for the slow waveform and the bicubic amplitude interpolation. This larger file will only download if you run either of those two modules. The files are hosted on [Zenodo](https://zenodo.org/record/3981654#.XzS_KRNKjlw).
-
-### Installing
-
-
-Install with pip (CPU only for now):
-```
-pip install fastemriwaveforms
-```
-
-To install from source:
-
-0) [Install Anaconda](https://docs.anaconda.com/anaconda/install/) if you do not have it.
-
-1) Clone the repository.
-
-```
-git clone https://github.com/BlackHolePerturbationToolkit/FastEMRIWaveforms.git
-cd FastEMRIWaveforms
-```
-
-2) Installation is made easy through [install.sh](install.sh). This is a bash script that will create a conda environment, install FEW, run tests, and install any additional packages needed for sampling or development. It will look for an `nvcc` binary, the `CUDA_HOME` variable, or the `CUDAHOME` variable. If it finds that information, it will install for CUDA as well (including installing the proper version of `cupy`). **Note**: If you already have performed installation and you are updating FEW after a `git pull`, then run `pip install .` rather than the following command.
-
-  ```
-  bash install.sh
-  ```
-
-  Options for installation can be applied by running `bash install.sh key=value`. These can be found with `bash install.sh -h`:
-  
-  ```
-  keyword argument options (given as key=value):
-    env_name:  Name of generated conda environment. Default is 'few_env'.
-    install_type:  Type of install. 'basic', 'development', or 'sampling'. 
-        'development' adds packages needed for development and documentation.
-        'sampling' adds packages for sampling like eryn, lisatools, corner, chainconsumer.
-        Default is 'basic'. 
-    run_tests: Either true or false. Whether to run tests after install. Default is true.
-  ```
-
-3) Load the environment (change "few_env" to the correct environment name is specified in previous step):
-
-```
-conda activate few_env
-```
-
-Please contact the developers if the installation does not work.
-
-### More Customized Installation (legacy)
-
-0) [Install Anaconda](https://docs.anaconda.com/anaconda/install/) if you do not have it.
 
 1) Create a virtual environment.
 
